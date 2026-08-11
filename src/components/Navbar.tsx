@@ -11,7 +11,8 @@ import {
   Sparkles,
   Menu,
   Share2,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -27,6 +28,7 @@ interface NavbarProps {
   onToggleSidebarMobile: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  onRefresh?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -38,8 +40,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebarMobile,
   searchQuery,
   onSearchChange,
+  onRefresh
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefreshClick = () => {
+    if (onRefresh) {
+      setIsRefreshing(true);
+      onRefresh();
+      setTimeout(() => setIsRefreshing(false), 800);
+    }
+  };
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -118,6 +130,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-bold text-amber-300">{stats.percentage}%</span>
               <span className="text-slate-500">({stats.ada}/{stats.total})</span>
             </div>
+
+            {/* Refresh / Sync Data Button */}
+            {onRefresh && (
+              <button
+                onClick={handleRefreshClick}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium border border-slate-700 transition-all"
+                title="Sinkronkan / Muat Ulang Data Server Terkini"
+              >
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-teal-400' : 'text-slate-400'} />
+                <span className="hidden lg:inline">Sinkronkan</span>
+              </button>
+            )}
 
             {/* Share App Link Button */}
             <button

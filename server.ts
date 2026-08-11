@@ -96,36 +96,83 @@ function logAction(userId: string, userName: string, userRole: string, action: s
   saveDB(db);
 }
 
+// Helper function to convert base64 fileUrl to real server file in uploads/ directory
+function processDocumentFileUrl(docData: Partial<DocumentItem>): Partial<DocumentItem> {
+  const result = { ...docData };
+  if (result.fileUrl && result.fileUrl.startsWith('data:')) {
+    try {
+      const rawName = result.fileName || 'dokumen.pdf';
+      const safeName = rawName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const timestamp = Date.now();
+      const storedFileName = `${timestamp}_${safeName}`;
+      const filePath = path.join(UPLOADS_DIR, storedFileName);
+
+      const matches = result.fileUrl.match(/^data:(.+);base64,(.+)$/);
+      let buffer: Buffer;
+      if (matches && matches.length === 3) {
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        const base64Content = result.fileUrl.replace(/^data:([A-Za-z-+\/]+);base64,/, '');
+        buffer = Buffer.from(base64Content, 'base64');
+      }
+
+      fs.writeFileSync(filePath, buffer);
+
+      const sizeInMB = (buffer.length / (1024 * 1024)).toFixed(2);
+      const fileSizeStr = buffer.length > 1024 * 1024 
+        ? `${sizeInMB} MB` 
+        : `${Math.round(buffer.length / 1024)} KB`;
+
+      result.fileUrl = `/uploads/${storedFileName}`;
+      result.fileName = safeName;
+      if (!result.fileSize) {
+        result.fileSize = fileSizeStr;
+      }
+    } catch (err) {
+      console.error('Error saving base64 file to server upload directory:', err);
+    }
+  }
+  return result;
+}
+
 // --- API ROUTES ---
 
-// 1. AUTH API
+// 1. FILE UPLOAD API
 app.post('/api/upload', (req, res) => {
   try {
     const { fileName, fileData } = req.body;
-    if (!fileName || !fileData) {
-      return res.status(400).json({ error: 'fileName dan fileData wajib diisi' });
+    if (!fileData) {
+      return res.status(400).json({ error: 'Data berkas tidak ditemukan' });
     }
 
-    // Strip base64 metadata prefix if present
-    const base64Content = fileData.replace(/^data:([A-Za-z-+\/]+);base64,/, '');
-    const buffer = Buffer.from(base64Content, 'base64');
+    const safeName = (fileName || 'dokumen.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const timestamp = Date.now();
+    const storedFileName = `${timestamp}_${safeName}`;
+    const filePath = path.join(UPLOADS_DIR, storedFileName);
 
-    const sanitizedFileName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
-    const filePath = path.join(UPLOADS_DIR, sanitizedFileName);
+    let buffer: Buffer;
+    const matches = fileData.match(/^data:(.+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      buffer = Buffer.from(matches[2], 'base64');
+    } else {
+      buffer = Buffer.from(fileData, 'base64');
+    }
 
     fs.writeFileSync(filePath, buffer);
 
-    const fileUrl = `/uploads/${sanitizedFileName}`;
-    const fileSize = `${(buffer.length / 1024).toFixed(1)} KB`;
+    const sizeInMB = (buffer.length / (1024 * 1024)).toFixed(2);
+    const fileSizeStr = buffer.length > 1024 * 1024 
+      ? `${sizeInMB} MB` 
+      : `${Math.round(buffer.length / 1024)} KB`;
 
-    res.json({
-      fileUrl,
-      fileName,
-      fileSize
+    return res.json({
+      fileUrl: `/uploads/${storedFileName}`,
+      fileName: safeName,
+      fileSize: fileSizeStr
     });
   } catch (err: any) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Gagal menyimpan berkas ke server' });
+    console.error('Upload handler error:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan berkas ke server' });
   }
 });
 
@@ -169,7 +216,9 @@ app.get('/api/documents', (_req, res) => {
 });
 
 app.post('/api/documents', (req, res) => {
-  const newDocData = req.body;
+  let newDocData = req.body;
+  newDocData = processDocumentFileUrl(newDocData);
+
   const user = req.headers['x-user-name'] as string || 'Admin';
   const userId = req.headers['x-user-id'] as string || 'usr-admin';
   const userRole = req.headers['x-user-role'] as string || 'master_admin';
@@ -194,7 +243,9 @@ app.post('/api/documents', (req, res) => {
 
 app.put('/api/documents/:id', (req, res) => {
   const { id } = req.params;
-  const updateData = req.body;
+  let updateData = req.body;
+  updateData = processDocumentFileUrl(updateData);
+
   const user = req.headers['x-user-name'] as string || 'Admin';
   const userId = req.headers['x-user-id'] as string || 'usr-admin';
   const userRole = req.headers['x-user-role'] as string || 'master_admin';
@@ -340,45 +391,6 @@ app.delete('/api/users/:id', (req, res) => {
 // 4. AUDIT LOGS API
 app.get('/api/audit-logs', (_req, res) => {
   res.json(db.logs);
-});
-
-// 5. FILE UPLOAD API
-app.post('/api/upload', (req, res) => {
-  try {
-    const { fileName, fileData } = req.body;
-    if (!fileData) {
-      return res.status(400).json({ error: 'Data berkas tidak ditemukan' });
-    }
-
-    const safeName = (fileName || 'document.pdf').replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const timestamp = Date.now();
-    const storedFileName = `${timestamp}_${safeName}`;
-    const filePath = path.join(UPLOADS_DIR, storedFileName);
-
-    let buffer: Buffer;
-    const matches = fileData.match(/^data:(.+);base64,(.+)$/);
-    if (matches && matches.length === 3) {
-      buffer = Buffer.from(matches[2], 'base64');
-    } else {
-      buffer = Buffer.from(fileData, 'base64');
-    }
-
-    fs.writeFileSync(filePath, buffer);
-
-    const sizeInMB = (buffer.length / (1024 * 1024)).toFixed(2);
-    const fileSizeStr = buffer.length > 1024 * 1024 
-      ? `${sizeInMB} MB` 
-      : `${Math.round(buffer.length / 1024)} KB`;
-
-    return res.json({
-      fileUrl: `/uploads/${storedFileName}`,
-      fileName: safeName,
-      fileSize: fileSizeStr
-    });
-  } catch (err: any) {
-    console.error('Upload handler error:', err);
-    return res.status(500).json({ error: 'Gagal menyimpan berkas ke server' });
-  }
 });
 
 // 5. GEMINI AI ASSISTANT API

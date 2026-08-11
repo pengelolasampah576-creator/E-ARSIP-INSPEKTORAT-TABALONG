@@ -115,6 +115,21 @@ export default function App() {
     fetchDocuments();
     fetchUsers();
     fetchLogs();
+
+    // Auto-sync polling every 10 seconds so all shared users see live updates & uploaded files
+    const interval = setInterval(() => {
+      fetchDocuments();
+    }, 10000);
+
+    const handleFocus = () => {
+      fetchDocuments();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Login handler
@@ -196,26 +211,25 @@ export default function App() {
     const userId = currentUser?.id || 'usr-admin';
     const userRole = currentUser?.role || 'master_admin';
 
-    let savedItem: DocumentItem;
+    setIsDocModalOpen(false);
 
     if (editingDoc) {
-      savedItem = {
+      const updatedItem: DocumentItem = {
         ...editingDoc,
         ...docData,
         updatedAt: new Date().toISOString(),
         updatedBy: user
-      } as DocumentItem;
+      };
 
       setDocuments(prev => {
-        const next = prev.map(d => d.id === editingDoc.id ? savedItem : d);
+        const next = prev.map(d => d.id === editingDoc.id ? updatedItem : d);
         localStorage.setItem('earsip_documents', JSON.stringify(next));
         return next;
       });
       setEditingDoc(null);
-      setIsDocModalOpen(false);
 
       try {
-        await fetch(`/api/documents/${editingDoc.id}`, {
+        const res = await fetch(`/api/documents/${editingDoc.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -223,15 +237,24 @@ export default function App() {
             'x-user-id': userId,
             'x-user-role': userRole
           },
-          body: JSON.stringify(docData)
+          body: JSON.stringify(updatedItem)
         });
+
+        if (res.ok) {
+          const serverDoc = await res.json();
+          setDocuments(prev => {
+            const next = prev.map(d => d.id === editingDoc.id ? serverDoc : d);
+            localStorage.setItem('earsip_documents', JSON.stringify(next));
+            return next;
+          });
+        }
         fetchLogs();
       } catch (err) {
         console.warn('Backend PUT sync error:', err);
       }
     } else {
       const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
-      savedItem = {
+      const newItem: DocumentItem = {
         id: `doc-${Date.now()}`,
         no: maxNo + 1,
         bidang: docData.bidang || 'Pengawasan',
@@ -249,11 +272,10 @@ export default function App() {
       };
 
       setDocuments(prev => {
-        const next = [savedItem, ...prev];
+        const next = [newItem, ...prev];
         localStorage.setItem('earsip_documents', JSON.stringify(next));
         return next;
       });
-      setIsDocModalOpen(false);
 
       try {
         const res = await fetch('/api/documents', {
@@ -264,13 +286,14 @@ export default function App() {
             'x-user-id': userId,
             'x-user-role': userRole
           },
-          body: JSON.stringify(docData)
+          body: JSON.stringify(newItem)
         });
+
         if (res.ok) {
-          const resData = await res.json();
-          if (resData && resData.id) {
+          const serverDoc = await res.json();
+          if (serverDoc && serverDoc.id) {
             setDocuments(prev => {
-              const next = prev.map(d => d.id === savedItem.id ? { ...d, id: resData.id } : d);
+              const next = prev.map(d => d.id === newItem.id ? serverDoc : d);
               localStorage.setItem('earsip_documents', JSON.stringify(next));
               return next;
             });
@@ -443,6 +466,7 @@ export default function App() {
         onToggleSidebarMobile={() => setIsSidebarMobileOpen(!isSidebarMobileOpen)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onRefresh={fetchDocuments}
       />
 
       {/* Main Layout Area */}
