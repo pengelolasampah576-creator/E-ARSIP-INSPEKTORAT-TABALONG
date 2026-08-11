@@ -107,17 +107,27 @@ export default function App() {
     const cleanUser = username.trim();
     const cleanPass = pass.trim();
 
+    if (!cleanUser || !cleanPass) {
+      return { success: false, error: 'Username dan password wajib diisi.' };
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password: cleanPass })
+        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       const contentType = res.headers.get('content-type');
       if (res.ok && contentType && contentType.includes('application/json')) {
         const data = await res.json();
         setCurrentUser(data.user);
+        setIsLoginModalOpen(false);
         localStorage.setItem('earsip_user', JSON.stringify(data.user));
         fetchLogs(); // refresh audit logs
         return { success: true };
@@ -126,10 +136,10 @@ export default function App() {
         return { success: false, error: data.error || 'Username atau password salah.' };
       }
     } catch (err) {
-      console.warn('API login request failed, attempting local authentication fallback:', err);
+      console.warn('API login request timed out or failed, falling back to instant local authentication:', err);
     }
 
-    // Local authentication fallback if server API is unavailable or non-responsive
+    // Local authentication fallback if server API times out or is offline
     const defaultPasswords: Record<string, string> = {
       admin: 'admin123',
       inspektur: 'inspektur123',
@@ -148,6 +158,7 @@ export default function App() {
       const expectedPass = defaultPasswords[foundUser.username] || 'admin123';
       if (cleanPass === expectedPass) {
         setCurrentUser(foundUser);
+        setIsLoginModalOpen(false);
         localStorage.setItem('earsip_user', JSON.stringify(foundUser));
         return { success: true };
       } else {
