@@ -1,0 +1,169 @@
+import React from 'react';
+import { User } from '../types';
+import { LOGO_URL } from '../assets';
+import { 
+  ShieldCheck, 
+  User as UserIcon, 
+  LogOut, 
+  Key, 
+  FileCheck2, 
+  Search,
+  Sparkles,
+  Menu,
+  Database
+} from 'lucide-react';
+
+interface NavbarProps {
+  currentUser: User | null;
+  onOpenLogin: () => void;
+  onLogout: () => void;
+  stats: {
+    total: number;
+    ada: number;
+    percentage: number;
+  };
+  onOpenAi: () => void;
+  onToggleSidebarMobile: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  currentUser,
+  onOpenLogin,
+  onLogout,
+  stats,
+  onOpenAi,
+  onToggleSidebarMobile,
+  searchQuery,
+  onSearchChange,
+}) => {
+  return (
+    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-4">
+          
+          {/* Left branding */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={onToggleSidebarMobile}
+              className="lg:hidden text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800"
+              title="Buka Menu"
+            >
+              <Menu size={22} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 p-0.5 border border-amber-500/30 flex-shrink-0 shadow-inner">
+                <img 
+                  src={LOGO_URL} 
+                  alt="Logo e-Arsip" 
+                  className="w-full h-full object-cover rounded"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-amber-200 via-white to-teal-200 bg-clip-text text-transparent">
+                    e-Arsip
+                  </span>
+                  <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full">
+                    Inspektorat
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-medium truncate max-w-[200px] sm:max-w-none">
+                  Inspektorat Daerah Kabupaten Tabalong
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Search bar */}
+          <div className="hidden md:flex flex-1 max-w-md mx-4">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder="Cari regulasi, SOP, nomor perbup..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full bg-slate-800/80 border border-slate-700/80 rounded-lg pl-9 pr-4 py-1.5 text-sm text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right User Badge & Stats */}
+          <div className="flex items-center gap-3">
+            
+            {/* Quick Stat Pill */}
+            <div className="hidden xl:flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1 rounded-full text-xs text-slate-300">
+              <FileCheck2 size={14} className="text-teal-400" />
+              <span>Kelengkapan:</span>
+              <span className="font-bold text-amber-300">{stats.percentage}%</span>
+              <span className="text-slate-500">({stats.ada}/{stats.total})</span>
+            </div>
+
+            {/* AI Assistant Button */}
+            <button
+              onClick={onOpenAi}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-lg text-xs font-medium shadow-sm transition-all"
+              title="Buka Asisten AI Inspektorat"
+            >
+              <Sparkles size={14} className="animate-pulse" />
+              <span className="hidden sm:inline">Asisten AI</span>
+            </button>
+
+            {/* User Profile / Master Login */}
+            {currentUser ? (
+              <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-lg p-1 pr-2">
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs ${
+                  currentUser.role === 'master_admin'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : currentUser.role === 'inspektur'
+                    ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                    : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {currentUser.role === 'master_admin' ? '👑' : currentUser.role === 'inspektur' ? '🔍' : '👁️'}
+                </div>
+                <div className="text-left hidden sm:block leading-tight">
+                  <div className="text-xs font-semibold text-slate-200 truncate max-w-[120px]">
+                    {currentUser.name.split(' ')[0]}
+                  </div>
+                  <div className="text-[10px] text-amber-400/90 capitalize font-medium flex items-center gap-1">
+                    {currentUser.role === 'master_admin' && <ShieldCheck size={10} />}
+                    {currentUser.role === 'master_admin' ? 'Master Admin' : currentUser.role === 'inspektur' ? 'Auditor / Inspektur' : 'Publik / Viewer'}
+                  </div>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-700 rounded transition-colors ml-1"
+                  title="Keluar"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenLogin}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium shadow transition-colors"
+              >
+                <Key size={14} />
+                <span>Login Master</span>
+              </button>
+            )}
+
+          </div>
+
+        </div>
+      </div>
+    </header>
+  );
+};
