@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { DocumentItem, DocumentStatus, User, UserRole, AuditLog } from './types';
-import { BIDANG_LIST, JENIS_DOKUMEN_LIST } from './data/initialData';
+import { INITIAL_DOCUMENTS, INITIAL_USERS, BIDANG_LIST, JENIS_DOKUMEN_LIST } from './data/initialData';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { DocumentMatrix } from './components/DocumentMatrix';
@@ -16,7 +16,19 @@ import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
 
 export default function App() {
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>(() => {
+    const saved = localStorage.getItem('earsip_documents');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Error parsing stored documents:', e);
+      }
+    }
+    return INITIAL_DOCUMENTS;
+  });
+
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
@@ -55,10 +67,13 @@ export default function App() {
       const res = await fetch('/api/documents');
       if (res.ok) {
         const data = await res.json();
-        setDocuments(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setDocuments(data);
+          localStorage.setItem('earsip_documents', JSON.stringify(data));
+        }
       }
     } catch (err) {
-      console.error('Error fetching documents:', err);
+      console.error('Error fetching documents from server:', err);
     }
   };
 
@@ -177,45 +192,106 @@ export default function App() {
 
   // Document Operations
   const handleSaveDocument = async (docData: Partial<DocumentItem>) => {
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-user-name': currentUser?.name || 'Admin',
-        'x-user-id': currentUser?.id || 'usr-admin',
-        'x-user-role': currentUser?.role || 'master_admin'
+    const user = currentUser?.name || 'Admin';
+    const userId = currentUser?.id || 'usr-admin';
+    const userRole = currentUser?.role || 'master_admin';
+
+    let savedItem: DocumentItem;
+
+    if (editingDoc) {
+      savedItem = {
+        ...editingDoc,
+        ...docData,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user
+      } as DocumentItem;
+
+      setDocuments(prev => {
+        const next = prev.map(d => d.id === editingDoc.id ? savedItem : d);
+        localStorage.setItem('earsip_documents', JSON.stringify(next));
+        return next;
+      });
+      setEditingDoc(null);
+      setIsDocModalOpen(false);
+
+      try {
+        await fetch(`/api/documents/${editingDoc.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-name': user,
+            'x-user-id': userId,
+            'x-user-role': userRole
+          },
+          body: JSON.stringify(docData)
+        });
+        fetchLogs();
+      } catch (err) {
+        console.warn('Backend PUT sync error:', err);
+      }
+    } else {
+      const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
+      savedItem = {
+        id: `doc-${Date.now()}`,
+        no: maxNo + 1,
+        bidang: docData.bidang || 'Pengawasan',
+        jenisDokumen: docData.jenisDokumen || 'Peraturan',
+        masterRegulasi: docData.masterRegulasi || 'Regulasi Baru',
+        dokumenYangAda: docData.dokumenYangAda || '-',
+        tahunTerbit: docData.tahunTerbit || '-',
+        status: docData.status || 'Ada',
+        catatan: docData.catatan || '',
+        fileName: docData.fileName || '',
+        fileUrl: docData.fileUrl || '',
+        fileSize: docData.fileSize || '',
+        updatedAt: new Date().toISOString(),
+        updatedBy: user
       };
 
-      if (editingDoc) {
-        // PUT update
-        const res = await fetch(`/api/documents/${editingDoc.id}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(docData)
-        });
-        if (res.ok) {
-          fetchDocuments();
-          fetchLogs();
-        }
-      } else {
-        // POST create
+      setDocuments(prev => {
+        const next = [savedItem, ...prev];
+        localStorage.setItem('earsip_documents', JSON.stringify(next));
+        return next;
+      });
+      setIsDocModalOpen(false);
+
+      try {
         const res = await fetch('/api/documents', {
           method: 'POST',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-name': user,
+            'x-user-id': userId,
+            'x-user-role': userRole
+          },
           body: JSON.stringify(docData)
         });
         if (res.ok) {
-          fetchDocuments();
-          fetchLogs();
+          const resData = await res.json();
+          if (resData && resData.id) {
+            setDocuments(prev => {
+              const next = prev.map(d => d.id === savedItem.id ? { ...d, id: resData.id } : d);
+              localStorage.setItem('earsip_documents', JSON.stringify(next));
+              return next;
+            });
+          }
         }
+        fetchLogs();
+      } catch (err) {
+        console.warn('Backend POST sync error:', err);
       }
-    } catch (err) {
-      console.error('Error saving document:', err);
     }
   };
 
   const handleQuickStatusChange = async (id: string, newStatus: DocumentStatus) => {
+    setDocuments(prev => {
+      const next = prev.map(d => d.id === id ? { ...d, status: newStatus } : d);
+      localStorage.setItem('earsip_documents', JSON.stringify(next));
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/documents/${id}`, {
+      await fetch(`/api/documents/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -225,20 +301,23 @@ export default function App() {
         },
         body: JSON.stringify({ status: newStatus })
       });
-      if (res.ok) {
-        fetchDocuments();
-        fetchLogs();
-      }
+      fetchLogs();
     } catch (err) {
-      console.error('Error updating status:', err);
+      console.warn('Status change sync error:', err);
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus dokumen regulasi ini?')) return;
 
+    setDocuments(prev => {
+      const next = prev.filter(d => d.id !== id);
+      localStorage.setItem('earsip_documents', JSON.stringify(next));
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/documents/${id}`, {
+      await fetch(`/api/documents/${id}`, {
         method: 'DELETE',
         headers: {
           'x-user-name': currentUser?.name || 'Admin',
@@ -246,12 +325,9 @@ export default function App() {
           'x-user-role': currentUser?.role || 'master_admin'
         }
       });
-      if (res.ok) {
-        fetchDocuments();
-        fetchLogs();
-      }
+      fetchLogs();
     } catch (err) {
-      console.error('Error deleting document:', err);
+      console.warn('Delete sync error:', err);
     }
   };
 

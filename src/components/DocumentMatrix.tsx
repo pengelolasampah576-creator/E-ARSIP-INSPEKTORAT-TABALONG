@@ -370,11 +370,36 @@ export const DocumentMatrix: React.FC<DocumentMatrixProps> = ({
                       {doc.masterRegulasi}
                     </td>
                     <td className="p-2.5 text-slate-700 border-r border-slate-200 leading-relaxed">
-                      {doc.dokumenYangAda !== '-' ? (
+                      {doc.dokumenYangAda !== '-' || doc.fileName ? (
                         <div className="font-medium text-slate-800">
-                          {doc.dokumenYangAda}
+                          <div>{doc.dokumenYangAda !== '-' ? doc.dokumenYangAda : doc.masterRegulasi}</div>
+                          
+                          {/* Uploaded File Badge */}
+                          {(doc.fileName || doc.fileUrl) && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <a
+                                href={doc.fileUrl || '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={doc.fileName || 'dokumen.pdf'}
+                                onClick={(e) => {
+                                  if (!doc.fileUrl) {
+                                    e.preventDefault();
+                                    onViewDoc(doc);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition-colors shadow-xs"
+                                title="Buka / Unduh Berkas Digital"
+                              >
+                                <Download size={11} className="text-amber-700" />
+                                <span className="max-w-[180px] truncate">{doc.fileName || 'Berkas Terunggah (PDF/DOC)'}</span>
+                                {doc.fileSize && <span className="text-amber-600 font-normal">({doc.fileSize})</span>}
+                              </a>
+                            </div>
+                          )}
+
                           {doc.catatan && (
-                            <div className="text-[10px] text-amber-800 bg-amber-50 p-1 rounded mt-1 border border-amber-200">
+                            <div className="text-[10px] text-amber-800 bg-amber-50/80 p-1 rounded mt-1 border border-amber-200">
                               ℹ️ {doc.catatan}
                             </div>
                           )}
