@@ -1,3 +1,19 @@
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/f626965a-006b-4045-8b38-32a99239a9a5
+
+## Run Locally
+
+**Prerequisites:** Node.js
+
+1. Install dependencies: `npm install`
+2. Set the `GEMINI_API_KEY` in `.env` to your Gemini API key
+3. Run the app: `npm run dev`
+
+---
+
 # e-Arsip Inspektorat - Sistem Inventori Matriks Regulasi & SOP
 
 Aplikasi **e-Arsip Inspektorat** adalah sistem manajemen inventori digital berbasis web yang dirancang khusus untuk memetakan, mengelola, mengunggah, dan mengevaluasi seluruh Peraturan, Kebijakan, Pedoman, serta Standar Operasional Prosedur (SOP) Inspektorat Daerah.
