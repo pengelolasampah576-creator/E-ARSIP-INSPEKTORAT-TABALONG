@@ -446,7 +446,7 @@ export default function App() {
       />
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex w-full">
         
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
@@ -506,7 +506,7 @@ export default function App() {
         )}
 
         {/* Main Content Pane */}
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto print:p-0">
+        <main className="flex-1 p-3 sm:p-5 overflow-y-auto min-w-0 w-full print:p-0">
           
           {/* PRINT-ONLY HEADER BLOCK */}
           <div className="hidden print:block mb-6 text-center border-b-2 border-slate-900 pb-4">

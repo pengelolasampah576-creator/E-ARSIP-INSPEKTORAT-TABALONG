@@ -292,7 +292,7 @@ export const DocumentMatrix: React.FC<DocumentMatrixProps> = ({
       </div>
 
       {/* Main Table Matrix matching screenshot strictly */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto w-full">
         <table className="w-full text-left border-collapse min-w-[1000px]">
           <thead>
             <tr className="bg-slate-100 text-slate-800 font-bold text-xs uppercase tracking-wider border-b-2 border-slate-300">
@@ -314,7 +314,7 @@ export const DocumentMatrix: React.FC<DocumentMatrixProps> = ({
               <th className="p-3 border-r border-slate-200 max-w-md">Dokumen yang ada</th>
               <th className="p-3 w-32 border-r border-slate-200 text-center">Tahun Terbit</th>
               <th className="p-3 w-36 text-center border-r border-slate-200">Keterangan</th>
-              <th className="p-3 w-24 text-center">Aksi</th>
+              <th className="p-3 w-32 text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 text-xs text-slate-800">
@@ -453,11 +453,22 @@ export const DocumentMatrix: React.FC<DocumentMatrixProps> = ({
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => onViewDoc(doc)}
-                          className="p-1 text-slate-600 hover:text-teal-700 hover:bg-teal-50 rounded"
-                          title="Lihat Detail Regulasi"
+                          className="p-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded"
+                          title="Lihat Detail & Pratinjau Dokumen"
                         >
                           <Eye size={15} />
                         </button>
+
+                        {doc.fileUrl && (
+                          <a
+                            href={doc.fileUrl}
+                            download={doc.fileName || 'dokumen.pdf'}
+                            className="p-1 text-amber-700 hover:text-amber-900 hover:bg-amber-100 rounded"
+                            title="Unduh Berkas Langsung"
+                          >
+                            <Download size={15} />
+                          </a>
+                        )}
 
                         {onOpenAiForDoc && (
                           <button

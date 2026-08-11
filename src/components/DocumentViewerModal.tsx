@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DocumentItem, UserRole } from '../types';
 import { 
   X, 
@@ -11,6 +11,8 @@ import {
   Tag, 
   User as UserIcon, 
   Download, 
+  Eye,
+  ExternalLink,
   Sparkles,
   Edit3
 } from 'lucide-react';
@@ -30,11 +32,13 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   userRole,
   onOpenAi
 }) => {
+  const [showInlinePreview, setShowInlinePreview] = useState<boolean>(false);
+
   if (!doc) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-150 my-auto">
         
         {/* Header */}
         <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
@@ -55,7 +59,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
           
           {/* Master Regulasi Title */}
           <div>
@@ -148,38 +152,97 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             </div>
           </div>
 
-          {/* Digital Attachment Preview Box */}
-          <div className="p-4 border border-dashed border-slate-300 rounded-lg bg-slate-50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FileText size={28} className="text-amber-600" />
-              <div>
-                <div className="text-xs font-bold text-slate-800">
-                  {doc.fileName || `${doc.masterRegulasi.substring(0, 35)}.pdf`}
+          {/* Digital Attachment Preview & Download Controls (Separated) */}
+          <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-lg border border-amber-200">
+                  <FileText size={24} />
                 </div>
-                <div className="text-[10px] text-slate-500">
-                  {doc.fileSize ? `Ukuran: ${doc.fileSize} • ` : ''}Arsip Digital Utuh Inspektorat Tabalong
+                <div>
+                  <div className="text-xs font-bold text-slate-800">
+                    {doc.fileName || `${doc.masterRegulasi.substring(0, 35)}.pdf`}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {doc.fileSize ? `Ukuran: ${doc.fileSize} • ` : ''}Arsip Digital Utuh Inspektorat Tabalong
+                  </div>
                 </div>
               </div>
             </div>
-            
+
+            {/* Separate View & Download Action Buttons */}
             {doc.fileUrl ? (
-              <a 
-                href={doc.fileUrl}
-                download={doc.fileName || 'dokumen.pdf'}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow transition-colors"
-              >
-                <Download size={13} /> Unduh / Buka Berkas
-              </a>
+              <div className="pt-2 border-t border-slate-200 flex items-center gap-2 flex-wrap">
+                {/* 1. MELIHAT / BUKA BERKAS */}
+                <button
+                  type="button"
+                  onClick={() => setShowInlinePreview(!showInlinePreview)}
+                  className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors border ${
+                    showInlinePreview
+                      ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                      : 'bg-white hover:bg-slate-100 text-blue-700 border-blue-300'
+                  }`}
+                >
+                  <Eye size={14} />
+                  <span>{showInlinePreview ? 'Sembunyikan Pratinjau' : 'Lihat Dokumen (Pratinjau)'}</span>
+                </button>
+
+                <a 
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  <span>Buka di Tab Baru</span>
+                </a>
+
+                {/* 2. MENDOWNLOAD BERKAS */}
+                <a 
+                  href={doc.fileUrl}
+                  download={doc.fileName || 'dokumen.pdf'}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow transition-colors ml-auto"
+                >
+                  <Download size={14} />
+                  <span>Unduh Berkas</span>
+                </a>
+              </div>
             ) : (
-              <button 
-                onClick={() => alert(`Belum ada berkas terunggah untuk "${doc.masterRegulasi}". Silakan klik "Edit" di kanan bawah untuk mengunggah dokumen digital (PDF/DOCX).`)}
-                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1"
-              >
-                <Download size={13} /> Belum Ada Berkas
-              </button>
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                <span className="text-xs text-slate-500 italic">Belum ada berkas terunggah</span>
+                <button 
+                  onClick={() => alert(`Belum ada berkas terunggah untuk "${doc.masterRegulasi}". Silakan klik "Edit" di kanan bawah untuk mengunggah dokumen digital (PDF/DOCX).`)}
+                  className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1"
+                >
+                  <Download size={13} /> Belum Ada Berkas
+                </button>
+              </div>
             )}
+
+            {/* Embedded Inline Document Previewer Frame */}
+            {doc.fileUrl && showInlinePreview && (
+              <div className="mt-3 rounded-lg overflow-hidden border border-slate-300 bg-slate-900 shadow-inner">
+                <div className="p-2 bg-slate-800 text-slate-300 text-[11px] font-mono flex items-center justify-between border-b border-slate-700 px-3">
+                  <span className="flex items-center gap-1.5 text-amber-400 font-sans font-semibold">
+                    <Eye size={13} /> Pratinjau Dokumen Digital
+                  </span>
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:underline flex items-center gap-1 text-slate-400 hover:text-white"
+                  >
+                    Buka Penuh <ExternalLink size={11} />
+                  </a>
+                </div>
+                <iframe
+                  src={doc.fileUrl}
+                  title="Pratinjau Dokumen"
+                  className="w-full h-80 bg-white"
+                />
+              </div>
+            )}
+
           </div>
 
           {/* Action buttons */}
@@ -224,3 +287,4 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
     </div>
   );
 };
+
