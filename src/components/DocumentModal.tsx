@@ -87,42 +87,63 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
     if (!file) return;
 
     setIsUploading(true);
+
+    const calcSizeMB = file.size / (1024 * 1024);
+    const sizeStr = calcSizeMB >= 1 
+      ? `${calcSizeMB.toFixed(2)} MB` 
+      : `${Math.round(file.size / 1024)} KB`;
+
     try {
       const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
+      
+      const fileData = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Gagal membaca berkas lokal'));
+        reader.readAsDataURL(file);
+      });
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const res = await fetch('/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fileName: file.name,
-            fileData: base64Data
-          })
+            fileData
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
-        if (!res.ok) throw new Error('Gagal mengunggah berkas');
-
-        const data = await res.json();
-        setFileUrl(data.fileUrl);
-        setFileName(data.fileName);
-        setFileSize(data.fileSize);
-
-        if (!dokumenYangAda) {
-          setDokumenYangAda(file.name.replace(/\.[^/.]+$/, ""));
+        if (res.ok) {
+          const data = await res.json();
+          setFileUrl(data.fileUrl || fileData);
+          setFileName(data.fileName || file.name);
+          setFileSize(data.fileSize || sizeStr);
+        } else {
+          setFileUrl(fileData);
+          setFileName(file.name);
+          setFileSize(sizeStr);
         }
-        if (status === 'Tidak Ada') {
-          setStatus('Ada');
-        }
-        setIsUploading(false);
-      };
-      reader.onerror = () => {
-        alert('Gagal membaca file lokal.');
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      } catch (uploadErr) {
+        console.warn('API upload fallback to local data URL:', uploadErr);
+        setFileUrl(fileData);
+        setFileName(file.name);
+        setFileSize(sizeStr);
+      }
+
+      if (!dokumenYangAda) {
+        setDokumenYangAda(file.name.replace(/\.[^/.]+$/, ""));
+      }
+      if (status === 'Tidak Ada') {
+        setStatus('Ada');
+      }
     } catch (err: any) {
-      console.error('Error uploading file:', err);
-      alert('Gagal mengunggah berkas ke server.');
+      console.error('Error processing file:', err);
+      alert('Gagal memproses berkas.');
+    } finally {
       setIsUploading(false);
     }
   };
