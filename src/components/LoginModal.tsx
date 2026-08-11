@@ -13,8 +13,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   onLogin
 }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -33,12 +33,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     } else {
       setErrorMsg(result.error || 'Login gagal. Periksa kembali username dan password Anda.');
     }
-  };
-
-  const handleQuickLogin = (usr: string, pass: string) => {
-    setUsername(usr);
-    setPassword(pass);
-    setErrorMsg('');
   };
 
   return (
@@ -73,54 +67,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <p className="text-xs text-slate-400 mt-0.5">
             Inspektorat Daerah Kabupaten Tabalong
           </p>
-        </div>
-
-        {/* Quick Demo Login Cards */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>Uji Coba Cepat (Click to Autofill):</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin', 'admin123')}
-              className={`p-2 rounded-lg border text-left transition-all ${
-                username === 'admin'
-                  ? 'bg-amber-100 border-amber-400 text-amber-900 shadow-sm'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="font-extrabold text-xs text-amber-800">👑 Master Admin</div>
-              <div className="text-[10px] text-slate-500 font-mono">admin / admin123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('inspektur', 'inspektur123')}
-              className={`p-2 rounded-lg border text-left transition-all ${
-                username === 'inspektur'
-                  ? 'bg-teal-100 border-teal-400 text-teal-900 shadow-sm'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="font-extrabold text-xs text-teal-800">🔍 Auditor</div>
-              <div className="text-[10px] text-slate-500 font-mono">inspektur / inspektur123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('publik', 'publik123')}
-              className={`p-2 rounded-lg border text-left transition-all ${
-                username === 'publik'
-                  ? 'bg-slate-200 border-slate-400 text-slate-900 shadow-sm'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="font-extrabold text-xs text-slate-800">👁️ Tamu / Publik</div>
-              <div className="text-[10px] text-slate-500 font-mono">publik / publik123</div>
-            </button>
-          </div>
         </div>
 
         {/* Login Form */}
