@@ -11,13 +11,20 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Ensure data directory exists for database persistence
+// Ensure data directory and uploads directory exist for database and file persistence
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve uploaded document files static route
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Initial Database State
 interface DBState {
@@ -92,6 +99,36 @@ function logAction(userId: string, userName: string, userRole: string, action: s
 // --- API ROUTES ---
 
 // 1. AUTH API
+app.post('/api/upload', (req, res) => {
+  try {
+    const { fileName, fileData } = req.body;
+    if (!fileName || !fileData) {
+      return res.status(400).json({ error: 'fileName dan fileData wajib diisi' });
+    }
+
+    // Strip base64 metadata prefix if present
+    const base64Content = fileData.replace(/^data:([A-Za-z-+\/]+);base64,/, '');
+    const buffer = Buffer.from(base64Content, 'base64');
+
+    const sanitizedFileName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+    const filePath = path.join(UPLOADS_DIR, sanitizedFileName);
+
+    fs.writeFileSync(filePath, buffer);
+
+    const fileUrl = `/uploads/${sanitizedFileName}`;
+    const fileSize = `${(buffer.length / 1024).toFixed(1)} KB`;
+
+    res.json({
+      fileUrl,
+      fileName,
+      fileSize
+    });
+  } catch (err: any) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Gagal menyimpan berkas ke server' });
+  }
+});
+
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from '../types';
 import { LOGO_URL } from '../assets';
 import { 
@@ -10,7 +10,8 @@ import {
   Search,
   Sparkles,
   Menu,
-  Database
+  Share2,
+  Check
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -38,6 +39,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   searchQuery,
   onSearchChange,
 }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -110,6 +118,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-bold text-amber-300">{stats.percentage}%</span>
               <span className="text-slate-500">({stats.ada}/{stats.total})</span>
             </div>
+
+            {/* Share App Link Button */}
+            <button
+              onClick={handleShare}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
+                copied 
+                  ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/50' 
+                  : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+              }`}
+              title="Salin Link Aplikasi e-Arsip untuk Dibagikan ke Pengguna Lain"
+            >
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+              <span className="hidden sm:inline">{copied ? 'Link Disalin!' : 'Bagikan Link'}</span>
+            </button>
 
             {/* AI Assistant Button */}
             <button

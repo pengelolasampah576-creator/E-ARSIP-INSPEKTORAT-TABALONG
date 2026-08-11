@@ -87,6 +87,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Restore session from localStorage if available
+    const saved = localStorage.getItem('earsip_user');
+    if (saved) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch (err) {
+        console.error('Error parsing stored user session:', err);
+      }
+    }
+
     fetchDocuments();
     fetchUsers();
     fetchLogs();
@@ -107,6 +117,7 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
+      localStorage.setItem('earsip_user', JSON.stringify(data.user));
       fetchLogs(); // refresh audit logs
       return { success: true };
     } catch (err: any) {
@@ -116,6 +127,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('earsip_user');
     setIsLoginModalOpen(true);
   };
 

@@ -27,6 +27,9 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
   const [status, setStatus] = useState<DocumentStatus>('Ada');
   const [catatan, setCatatan] = useState('');
   const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileSize, setFileSize] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -38,6 +41,8 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
       setStatus(initialData.status || 'Ada');
       setCatatan(initialData.catatan || '');
       setFileName(initialData.fileName || '');
+      setFileUrl(initialData.fileUrl || '');
+      setFileSize(initialData.fileSize || '');
     } else {
       setBidang('Pengawasan');
       setJenisDokumen('SOP');
@@ -47,6 +52,8 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
       setStatus('Ada');
       setCatatan('');
       setFileName('');
+      setFileUrl('');
+      setFileSize('');
     }
   }, [initialData, isOpen]);
 
@@ -67,22 +74,56 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
       tahunTerbit: tahunTerbit.trim() || '-',
       status,
       catatan,
-      fileName
+      fileName,
+      fileUrl,
+      fileSize
     });
 
     onClose();
   };
 
-  const handleSimulateFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      if (!dokumenYangAda) {
-        setDokumenYangAda(file.name.replace(/\.[^/.]+$/, ""));
-      }
-      if (status === 'Tidak Ada') {
-        setStatus('Ada');
-      }
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileData: base64Data
+          })
+        });
+
+        if (!res.ok) throw new Error('Gagal mengunggah berkas');
+
+        const data = await res.json();
+        setFileUrl(data.fileUrl);
+        setFileName(data.fileName);
+        setFileSize(data.fileSize);
+
+        if (!dokumenYangAda) {
+          setDokumenYangAda(file.name.replace(/\.[^/.]+$/, ""));
+        }
+        if (status === 'Tidak Ada') {
+          setStatus('Ada');
+        }
+        setIsUploading(false);
+      };
+      reader.onerror = () => {
+        alert('Gagal membaca file lokal.');
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Error uploading file:', err);
+      alert('Gagal mengunggah berkas ke server.');
+      setIsUploading(false);
     }
   };
 
@@ -234,18 +275,24 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
           <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-lg">
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
               <Upload size={14} className="text-amber-600" />
-              Upload Digital Attachment (PDF/DOCX)
+              Upload Digital Attachment (PDF/DOCX) - Berkas Disimpan Utuh
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
-                onChange={handleSimulateFileUpload}
-                className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                disabled={isUploading}
+                onChange={handleFileUpload}
+                className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer disabled:opacity-50"
               />
-              {fileName && (
+              {isUploading && (
+                <span className="text-xs text-amber-700 font-semibold animate-pulse">
+                  Mengunggah berkas ke server...
+                </span>
+              )}
+              {!isUploading && fileName && (
                 <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                  <CheckCircle2 size={14} /> {fileName}
+                  <CheckCircle2 size={14} /> {fileName} {fileSize ? `(${fileSize})` : ''}
                 </span>
               )}
             </div>

@@ -151,23 +151,35 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           {/* Digital Attachment Preview Box */}
           <div className="p-4 border border-dashed border-slate-300 rounded-lg bg-slate-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText size={28} className="text-slate-500" />
+              <FileText size={28} className="text-amber-600" />
               <div>
                 <div className="text-xs font-bold text-slate-800">
-                  {doc.fileName || `${doc.masterRegulasi.substring(0, 30)}.pdf`}
+                  {doc.fileName || `${doc.masterRegulasi.substring(0, 35)}.pdf`}
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  Arsip Digital Inspektorat Tabalong • PDF/Doc
+                  {doc.fileSize ? `Ukuran: ${doc.fileSize} • ` : ''}Arsip Digital Utuh Inspektorat Tabalong
                 </div>
               </div>
             </div>
             
-            <button 
-              onClick={() => alert(`Mengunduh salinan berkas: ${doc.masterRegulasi}`)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1"
-            >
-              <Download size={13} /> Download
-            </button>
+            {doc.fileUrl ? (
+              <a 
+                href={doc.fileUrl}
+                download={doc.fileName || 'dokumen.pdf'}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow transition-colors"
+              >
+                <Download size={13} /> Unduh / Buka Berkas
+              </a>
+            ) : (
+              <button 
+                onClick={() => alert(`Belum ada berkas terunggah untuk "${doc.masterRegulasi}". Silakan klik "Edit" di kanan bawah untuk mengunggah dokumen digital (PDF/DOCX).`)}
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1"
+              >
+                <Download size={13} /> Belum Ada Berkas
+              </button>
+            )}
           </div>
 
           {/* Action buttons */}
