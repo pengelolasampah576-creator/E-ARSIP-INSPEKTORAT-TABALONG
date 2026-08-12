@@ -296,6 +296,55 @@ app.delete('/api/documents/:id', (req, res) => {
   res.json({ message: 'Dokumen berhasil dihapus' });
 });
 
+// Bulk Sync & Restore Endpoint (merges client data into server db.json)
+app.post('/api/documents/sync-all', (req, res) => {
+  try {
+    const { documents } = req.body;
+    if (!Array.isArray(documents)) {
+      return res.status(400).json({ error: 'Payload documents harus berupa array' });
+    }
+
+    const user = req.headers['x-user-name'] as string || 'Admin';
+    const userId = req.headers['x-user-id'] as string || 'usr-admin';
+    const userRole = req.headers['x-user-role'] as string || 'master_admin';
+
+    // Process base64 files and merge
+    const processedList = documents.map(doc => processDocumentFileUrl(doc));
+
+    // Map existing db documents by ID and No
+    const docMap = new Map<string, DocumentItem>();
+    
+    // First load current db documents
+    db.documents.forEach(d => {
+      if (d.id) docMap.set(d.id, d);
+    });
+
+    // Merge incoming documents (incoming overwrites or adds)
+    processedList.forEach(incomingDoc => {
+      if (incomingDoc.id) {
+        docMap.set(incomingDoc.id, incomingDoc as DocumentItem);
+      }
+    });
+
+    // Convert back to array sorted by No
+    const mergedList = Array.from(docMap.values()).sort((a, b) => (a.no || 0) - (b.no || 0));
+
+    db.documents = mergedList;
+    saveDB(db);
+
+    logAction(userId, user, userRole, 'Sinkronisasi Massal', `Sinkronisasi massal ${processedList.length} dokumen ke database server.`);
+
+    return res.json({
+      message: 'Sinkronisasi berhasil',
+      total: db.documents.length,
+      documents: db.documents
+    });
+  } catch (err: any) {
+    console.error('Error during bulk sync:', err);
+    return res.status(500).json({ error: 'Gagal melakukan sinkronisasi massal' });
+  }
+});
+
 // 3. USERS MANAGEMENT API (Master Admin)
 app.get('/api/users', (_req, res) => {
   res.json(db.users);

@@ -61,15 +61,71 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [docForAi, setDocForAi] = useState<DocumentItem | null>(null);
 
-  // Fetch initial data from Express backend REST API
+  // Helper for safe localStorage saving (handles QuotaExceededError when base64 files are present)
+  const safeSaveToLocalStorage = (key: string, data: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (err) {
+      console.warn('localStorage storage limit reached:', err);
+      try {
+        if (Array.isArray(data)) {
+          const cleaned = data.map((item: any) => {
+            if (item.fileUrl && item.fileUrl.startsWith('data:')) {
+              return { ...item, fileUrl: '' };
+            }
+            return item;
+          });
+          localStorage.setItem(key, JSON.stringify(cleaned));
+        }
+      } catch (e) {
+        console.error('Failed to save cleaned data to localStorage:', e);
+      }
+    }
+  };
+
+  // Fetch initial data & sync with Express backend REST API
   const fetchDocuments = async () => {
     try {
       const res = await fetch('/api/documents');
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setDocuments(data);
-          localStorage.setItem('earsip_documents', JSON.stringify(data));
+        const serverData = await res.json();
+        if (Array.isArray(serverData) && serverData.length > 0) {
+          // Check if client local storage has unsynced updates created offline or before backend sync
+          const savedLocal = localStorage.getItem('earsip_documents');
+          if (savedLocal) {
+            try {
+              const localDocs = JSON.parse(savedLocal);
+              if (Array.isArray(localDocs) && localDocs.length > 0) {
+                const unsyncedLocal = localDocs.filter((ld: any) => {
+                  const sd = serverData.find((s: any) => s.id === ld.id);
+                  if (!sd) return true; // new doc not in server yet
+                  if (ld.updatedAt && sd.updatedAt && new Date(ld.updatedAt) > new Date(sd.updatedAt)) return true;
+                  return false;
+                });
+
+                if (unsyncedLocal.length > 0) {
+                  console.log(`Auto-syncing ${unsyncedLocal.length} unsynced local documents to server...`);
+                  await fetch('/api/documents/sync-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documents: localDocs })
+                  });
+                  const syncRes = await fetch('/api/documents');
+                  if (syncRes.ok) {
+                    const syncedData = await syncRes.json();
+                    setDocuments(syncedData);
+                    safeSaveToLocalStorage('earsip_documents', syncedData);
+                    return;
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('Error during local sync check:', e);
+            }
+          }
+
+          setDocuments(serverData);
+          safeSaveToLocalStorage('earsip_documents', serverData);
         }
       }
     } catch (err) {
@@ -223,7 +279,7 @@ export default function App() {
 
       setDocuments(prev => {
         const next = prev.map(d => d.id === editingDoc.id ? updatedItem : d);
-        localStorage.setItem('earsip_documents', JSON.stringify(next));
+        safeSaveToLocalStorage('earsip_documents', next);
         return next;
       });
       setEditingDoc(null);
@@ -244,7 +300,7 @@ export default function App() {
           const serverDoc = await res.json();
           setDocuments(prev => {
             const next = prev.map(d => d.id === editingDoc.id ? serverDoc : d);
-            localStorage.setItem('earsip_documents', JSON.stringify(next));
+            safeSaveToLocalStorage('earsip_documents', next);
             return next;
           });
         }
@@ -273,7 +329,7 @@ export default function App() {
 
       setDocuments(prev => {
         const next = [newItem, ...prev];
-        localStorage.setItem('earsip_documents', JSON.stringify(next));
+        safeSaveToLocalStorage('earsip_documents', next);
         return next;
       });
 
@@ -294,7 +350,7 @@ export default function App() {
           if (serverDoc && serverDoc.id) {
             setDocuments(prev => {
               const next = prev.map(d => d.id === newItem.id ? serverDoc : d);
-              localStorage.setItem('earsip_documents', JSON.stringify(next));
+              safeSaveToLocalStorage('earsip_documents', next);
               return next;
             });
           }
@@ -309,7 +365,7 @@ export default function App() {
   const handleQuickStatusChange = async (id: string, newStatus: DocumentStatus) => {
     setDocuments(prev => {
       const next = prev.map(d => d.id === id ? { ...d, status: newStatus } : d);
-      localStorage.setItem('earsip_documents', JSON.stringify(next));
+      safeSaveToLocalStorage('earsip_documents', next);
       return next;
     });
 
@@ -335,7 +391,7 @@ export default function App() {
 
     setDocuments(prev => {
       const next = prev.filter(d => d.id !== id);
-      localStorage.setItem('earsip_documents', JSON.stringify(next));
+      safeSaveToLocalStorage('earsip_documents', next);
       return next;
     });
 
@@ -350,7 +406,59 @@ export default function App() {
       });
       fetchLogs();
     } catch (err) {
-      console.warn('Delete sync error:', err);
+      console.warn('Backend DELETE sync error:', err);
+    }
+  };
+
+  // Export / Import Backup JSON Handlers
+  const handleExportBackup = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(documents, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `earsip_database_tabalong_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importedDocs = JSON.parse(text);
+      if (!Array.isArray(importedDocs) || importedDocs.length === 0) {
+        alert('File JSON backup tidak valid atau kosong.');
+        return;
+      }
+
+      const confirmImport = confirm(`Apakah Anda yakin ingin mengimpor ${importedDocs.length} data regulasi dari file backup ini? Data di server dan seluruh komputer pengguna lain akan langsung diperbarui.`);
+      if (!confirmImport) return;
+
+      const res = await fetch('/api/documents/sync-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-name': currentUser?.name || 'Admin',
+          'x-user-id': currentUser?.id || 'usr-admin',
+          'x-user-role': currentUser?.role || 'master_admin'
+        },
+        body: JSON.stringify({ documents: importedDocs })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        alert(`Berhasil mengimpor dan menyinkronkan ${result.total || importedDocs.length} data regulasi ke database server!`);
+        fetchDocuments();
+        fetchLogs();
+      } else {
+        alert('Gagal menyinkronkan data impor ke server.');
+      }
+    } catch (err) {
+      console.error('Error importing JSON backup:', err);
+      alert('Format file JSON tidak valid.');
     }
   };
 
@@ -467,6 +575,8 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onRefresh={fetchDocuments}
+        onExportBackup={handleExportBackup}
+        onImportBackup={handleImportBackup}
       />
 
       {/* Main Layout Area */}

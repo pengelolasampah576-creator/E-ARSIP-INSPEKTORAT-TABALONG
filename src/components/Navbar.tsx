@@ -12,7 +12,10 @@ import {
   Menu,
   Share2,
   Check,
-  RefreshCw
+  RefreshCw,
+  Download,
+  Upload,
+  Database
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -29,6 +32,8 @@ interface NavbarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onRefresh?: () => void;
+  onExportBackup?: () => void;
+  onImportBackup?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,7 +45,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebarMobile,
   searchQuery,
   onSearchChange,
-  onRefresh
+  onRefresh,
+  onExportBackup,
+  onImportBackup
 }) => {
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -141,6 +148,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-teal-400' : 'text-slate-400'} />
                 <span className="hidden lg:inline">Sinkronkan</span>
               </button>
+            )}
+
+            {/* Backup / Restore Database JSON */}
+            {onExportBackup && (
+              <button
+                onClick={onExportBackup}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-amber-300 rounded-lg text-xs font-medium border border-slate-700 transition-all"
+                title="Ekspor Backup File Database (.JSON)"
+              >
+                <Download size={14} className="text-amber-400" />
+                <span className="hidden xl:inline">Ekspor JSON</span>
+              </button>
+            )}
+
+            {onImportBackup && (
+              <label
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-teal-300 rounded-lg text-xs font-medium border border-slate-700 cursor-pointer transition-all"
+                title="Impor & Pulihkan Database dari File (.JSON)"
+              >
+                <Upload size={14} className="text-teal-400" />
+                <span className="hidden xl:inline">Impor JSON</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={onImportBackup}
+                  className="hidden"
+                />
+              </label>
             )}
 
             {/* Share App Link Button */}
