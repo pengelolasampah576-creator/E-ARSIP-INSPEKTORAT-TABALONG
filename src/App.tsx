@@ -14,7 +14,7 @@ import { AiAssistantModal } from './components/AiAssistantModal';
 import { LoginModal } from './components/LoginModal';
 import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
-import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch } from './lib/firebase';
+import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch, getDocs } from './lib/firebase';
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -119,6 +119,23 @@ export default function App() {
     const docsRef = collection(db, 'documents');
     const unsubscribeDocs = onSnapshot(docsRef, async (snapshot) => {
       if (!snapshot.empty) {
+        // If auto-purge hasn't run yet, clean out existing example documents
+        if (!localStorage.getItem('earsip_purged_examples')) {
+          localStorage.setItem('earsip_purged_examples', 'true');
+          try {
+            const batch = writeBatch(db);
+            snapshot.forEach((dSnap) => {
+              batch.delete(doc(db, 'documents', dSnap.id));
+            });
+            await batch.commit();
+          } catch (e) {
+            console.error('Error auto purging example docs:', e);
+          }
+          setDocuments([]);
+          safeSaveToLocalStorage('earsip_documents', []);
+          return;
+        }
+
         const docsList: DocumentItem[] = [];
         snapshot.forEach((docSnap) => {
           docsList.push(docSnap.data() as DocumentItem);
@@ -127,18 +144,9 @@ export default function App() {
         setDocuments(docsList);
         safeSaveToLocalStorage('earsip_documents', docsList);
       } else {
-        console.log('Firestore documents empty. Initializing Firestore with initial regulations...');
-        // Seed Firestore with initial documents
-        try {
-          const batch = writeBatch(db);
-          INITIAL_DOCUMENTS.forEach((item) => {
-            const itemRef = doc(db, 'documents', item.id);
-            batch.set(itemRef, item);
-          });
-          await batch.commit();
-        } catch (e) {
-          console.error('Error seeding initial documents into Firestore:', e);
-        }
+        localStorage.setItem('earsip_purged_examples', 'true');
+        setDocuments([]);
+        safeSaveToLocalStorage('earsip_documents', []);
       }
     }, (err) => {
       console.error('Firestore documents onSnapshot error:', err);
@@ -474,6 +482,30 @@ export default function App() {
     window.print();
   };
 
+  const handleResetAllDocuments = async () => {
+    if (!confirm('Apakah Anda yakin ingin mengosongkan SELURUH data contoh regulasi? Data di database cloud dan tampilan aplikasi akan langsung menjadi kosong untuk diisi dengan data regulasi yang sebenarnya.')) {
+      return;
+    }
+    try {
+      const docsSnapshot = await getDocs(collection(db, 'documents'));
+      if (!docsSnapshot.empty) {
+        const batch = writeBatch(db);
+        docsSnapshot.forEach((dSnap) => {
+          batch.delete(doc(db, 'documents', dSnap.id));
+        });
+        await batch.commit();
+      }
+      setDocuments([]);
+      localStorage.removeItem('earsip_documents');
+      localStorage.setItem('earsip_purged_examples', 'true');
+      await logActionToFirestore('Kosongkan Data', 'Mengosongkan seluruh data regulasi contoh untuk pengisian data regulasi aktual.');
+      alert('Berhasil mengosongkan seluruh data regulasi! Aplikasi sekarang bersih dan siap diisi dengan regulasi aktual.');
+    } catch (err) {
+      console.error('Error resetting documents in Firestore:', err);
+      alert('Gagal mengosongkan data dari database cloud.');
+    }
+  };
+
   // Stats calculation
   const totalDocs = documents.length;
   const adaDocs = documents.filter(d => d.status === 'Ada').length;
@@ -498,6 +530,7 @@ export default function App() {
         onRefresh={fetchDocuments}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
+        onResetData={handleResetAllDocuments}
       />
 
       {/* Main Layout Area */}

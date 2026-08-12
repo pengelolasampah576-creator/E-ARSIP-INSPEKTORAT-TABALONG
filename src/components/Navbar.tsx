@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Download,
   Upload,
-  Database
+  Database,
+  Trash2
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,6 +35,7 @@ interface NavbarProps {
   onRefresh?: () => void;
   onExportBackup?: () => void;
   onImportBackup?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onResetData?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -47,7 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSearchChange,
   onRefresh,
   onExportBackup,
-  onImportBackup
+  onImportBackup,
+  onResetData
 }) => {
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -182,6 +185,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="hidden"
                 />
               </label>
+            )}
+
+            {onResetData && (
+              <button
+                onClick={onResetData}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-950/50 hover:bg-rose-900/80 text-rose-300 rounded-lg text-xs font-medium border border-rose-800/60 transition-all"
+                title="Kosongkan Semua Data Contoh Regulasi untuk Pengisian Baru"
+              >
+                <Trash2 size={14} className="text-rose-400" />
+                <span className="hidden xl:inline">Kosongkan Data</span>
+              </button>
             )}
 
             {/* Share App Link Button */}
