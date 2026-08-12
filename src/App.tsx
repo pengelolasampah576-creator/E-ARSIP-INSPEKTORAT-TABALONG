@@ -14,6 +14,7 @@ import { AiAssistantModal } from './components/AiAssistantModal';
 import { LoginModal } from './components/LoginModal';
 import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
+import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch } from './lib/firebase';
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -83,110 +84,119 @@ export default function App() {
     }
   };
 
-  // Fetch initial data & sync with Express backend REST API
-  const fetchDocuments = async () => {
+  // Helper function to record activity logs in Firestore
+  const logActionToFirestore = async (action: string, details: string) => {
     try {
-      const res = await fetch('/api/documents');
-      if (res.ok) {
-        const serverData = await res.json();
-        if (Array.isArray(serverData) && serverData.length > 0) {
-          // Check if client local storage has unsynced updates created offline or before backend sync
-          const savedLocal = localStorage.getItem('earsip_documents');
-          if (savedLocal) {
-            try {
-              const localDocs = JSON.parse(savedLocal);
-              if (Array.isArray(localDocs) && localDocs.length > 0) {
-                const unsyncedLocal = localDocs.filter((ld: any) => {
-                  const sd = serverData.find((s: any) => s.id === ld.id);
-                  if (!sd) return true; // new doc not in server yet
-                  if (ld.updatedAt && sd.updatedAt && new Date(ld.updatedAt) > new Date(sd.updatedAt)) return true;
-                  return false;
-                });
-
-                if (unsyncedLocal.length > 0) {
-                  console.log(`Auto-syncing ${unsyncedLocal.length} unsynced local documents to server...`);
-                  await fetch('/api/documents/sync-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ documents: localDocs })
-                  });
-                  const syncRes = await fetch('/api/documents');
-                  if (syncRes.ok) {
-                    const syncedData = await syncRes.json();
-                    setDocuments(syncedData);
-                    safeSaveToLocalStorage('earsip_documents', syncedData);
-                    return;
-                  }
-                }
-              }
-            } catch (e) {
-              console.error('Error during local sync check:', e);
-            }
-          }
-
-          setDocuments(serverData);
-          safeSaveToLocalStorage('earsip_documents', serverData);
-        }
-      }
+      const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const logItem: AuditLog = {
+        id: logId,
+        userId: currentUser?.id || 'usr-admin',
+        userName: currentUser?.name || 'Admin',
+        userRole: currentUser?.role || 'master_admin',
+        action,
+        details,
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'activity_logs', logId), logItem);
     } catch (err) {
-      console.error('Error fetching documents from server:', err);
+      console.warn('Error recording log to Firestore:', err);
     }
   };
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    }
-  };
-
-  const fetchLogs = async () => {
-    try {
-      const res = await fetch('/api/audit-logs');
-      if (res.ok) {
-        const data = await res.json();
-        setAuditLogs(data);
-      }
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-    }
-  };
-
+  // Real-time Firestore Sync Subscriptions
   useEffect(() => {
-    // Restore session from localStorage if available
-    const saved = localStorage.getItem('earsip_user');
-    if (saved) {
+    // Restore user session from localStorage
+    const savedUser = localStorage.getItem('earsip_user');
+    if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(saved));
+        setCurrentUser(JSON.parse(savedUser));
       } catch (err) {
         console.error('Error parsing stored user session:', err);
       }
     }
 
-    fetchDocuments();
-    fetchUsers();
-    fetchLogs();
+    // 1. Subscribe to Documents Collection Realtime
+    const docsRef = collection(db, 'documents');
+    const unsubscribeDocs = onSnapshot(docsRef, async (snapshot) => {
+      if (!snapshot.empty) {
+        const docsList: DocumentItem[] = [];
+        snapshot.forEach((docSnap) => {
+          docsList.push(docSnap.data() as DocumentItem);
+        });
+        docsList.sort((a, b) => (a.no || 0) - (b.no || 0));
+        setDocuments(docsList);
+        safeSaveToLocalStorage('earsip_documents', docsList);
+      } else {
+        console.log('Firestore documents empty. Initializing Firestore with initial regulations...');
+        // Seed Firestore with initial documents
+        try {
+          const batch = writeBatch(db);
+          INITIAL_DOCUMENTS.forEach((item) => {
+            const itemRef = doc(db, 'documents', item.id);
+            batch.set(itemRef, item);
+          });
+          await batch.commit();
+        } catch (e) {
+          console.error('Error seeding initial documents into Firestore:', e);
+        }
+      }
+    }, (err) => {
+      console.error('Firestore documents onSnapshot error:', err);
+    });
 
-    // Auto-sync polling every 10 seconds so all shared users see live updates & uploaded files
-    const interval = setInterval(() => {
-      fetchDocuments();
-    }, 10000);
+    // 2. Subscribe to Users Collection Realtime
+    const usersRef = collection(db, 'users');
+    const unsubscribeUsers = onSnapshot(usersRef, async (snapshot) => {
+      if (!snapshot.empty) {
+        const usersList: User[] = [];
+        snapshot.forEach((userSnap) => {
+          usersList.push(userSnap.data() as User);
+        });
+        setUsers(usersList);
+      } else {
+        try {
+          const batch = writeBatch(db);
+          INITIAL_USERS.forEach((usr) => {
+            const uRef = doc(db, 'users', usr.id);
+            batch.set(uRef, usr);
+          });
+          await batch.commit();
+        } catch (e) {
+          console.error('Error seeding initial users into Firestore:', e);
+        }
+      }
+    }, (err) => {
+      console.error('Firestore users onSnapshot error:', err);
+    });
 
-    const handleFocus = () => {
-      fetchDocuments();
-    };
-    window.addEventListener('focus', handleFocus);
+    // 3. Subscribe to Activity Logs Collection Realtime
+    const logsRef = collection(db, 'activity_logs');
+    const unsubscribeLogs = onSnapshot(logsRef, (snapshot) => {
+      if (!snapshot.empty) {
+        const logsList: AuditLog[] = [];
+        snapshot.forEach((logSnap) => {
+          logsList.push(logSnap.data() as AuditLog);
+        });
+        logsList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setAuditLogs(logsList);
+      }
+    }, (err) => {
+      console.error('Firestore logs onSnapshot error:', err);
+    });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      unsubscribeDocs();
+      unsubscribeUsers();
+      unsubscribeLogs();
     };
   }, []);
+
+  const fetchDocuments = () => {
+    // Legacy refresh trigger helper
+  };
+  const fetchLogs = () => {
+    // Legacy refresh trigger helper
+  };
 
   // Login handler
   const handleLogin = async (username: string, pass: string) => {
@@ -261,152 +271,80 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
-  // Document Operations
+  // Document Operations using Realtime Firebase Firestore
   const handleSaveDocument = async (docData: Partial<DocumentItem>) => {
     const user = currentUser?.name || 'Admin';
-    const userId = currentUser?.id || 'usr-admin';
-    const userRole = currentUser?.role || 'master_admin';
 
     setIsDocModalOpen(false);
 
-    if (editingDoc) {
-      const updatedItem: DocumentItem = {
-        ...editingDoc,
-        ...docData,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user
-      };
+    try {
+      if (editingDoc) {
+        const updatedItem: DocumentItem = {
+          ...editingDoc,
+          ...docData,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user
+        };
 
-      setDocuments(prev => {
-        const next = prev.map(d => d.id === editingDoc.id ? updatedItem : d);
-        safeSaveToLocalStorage('earsip_documents', next);
-        return next;
-      });
-      setEditingDoc(null);
+        setEditingDoc(null);
+        await setDoc(doc(db, 'documents', editingDoc.id), updatedItem);
+        await logActionToFirestore('Ubah Dokumen', `Memperbarui dokumen ${updatedItem.masterRegulasi || updatedItem.id}`);
+      } else {
+        const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
+        const newId = `doc-${Date.now()}`;
+        const newItem: DocumentItem = {
+          id: newId,
+          no: maxNo + 1,
+          bidang: docData.bidang || 'Pengawasan',
+          jenisDokumen: docData.jenisDokumen || 'Peraturan',
+          masterRegulasi: docData.masterRegulasi || 'Regulasi Baru',
+          dokumenYangAda: docData.dokumenYangAda || '-',
+          tahunTerbit: docData.tahunTerbit || '-',
+          status: docData.status || 'Ada',
+          catatan: docData.catatan || '',
+          fileName: docData.fileName || '',
+          fileUrl: docData.fileUrl || '',
+          fileSize: docData.fileSize || '',
+          updatedAt: new Date().toISOString(),
+          updatedBy: user
+        };
 
-      try {
-        const res = await fetch(`/api/documents/${editingDoc.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-name': user,
-            'x-user-id': userId,
-            'x-user-role': userRole
-          },
-          body: JSON.stringify(updatedItem)
-        });
-
-        if (res.ok) {
-          const serverDoc = await res.json();
-          setDocuments(prev => {
-            const next = prev.map(d => d.id === editingDoc.id ? serverDoc : d);
-            safeSaveToLocalStorage('earsip_documents', next);
-            return next;
-          });
-        }
-        fetchLogs();
-      } catch (err) {
-        console.warn('Backend PUT sync error:', err);
+        await setDoc(doc(db, 'documents', newId), newItem);
+        await logActionToFirestore('Tambah Dokumen', `Menambahkan dokumen baru: ${newItem.masterRegulasi}`);
       }
-    } else {
-      const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
-      const newItem: DocumentItem = {
-        id: `doc-${Date.now()}`,
-        no: maxNo + 1,
-        bidang: docData.bidang || 'Pengawasan',
-        jenisDokumen: docData.jenisDokumen || 'Peraturan',
-        masterRegulasi: docData.masterRegulasi || 'Regulasi Baru',
-        dokumenYangAda: docData.dokumenYangAda || '-',
-        tahunTerbit: docData.tahunTerbit || '-',
-        status: docData.status || 'Ada',
-        catatan: docData.catatan || '',
-        fileName: docData.fileName || '',
-        fileUrl: docData.fileUrl || '',
-        fileSize: docData.fileSize || '',
-        updatedAt: new Date().toISOString(),
-        updatedBy: user
-      };
-
-      setDocuments(prev => {
-        const next = [newItem, ...prev];
-        safeSaveToLocalStorage('earsip_documents', next);
-        return next;
-      });
-
-      try {
-        const res = await fetch('/api/documents', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-name': user,
-            'x-user-id': userId,
-            'x-user-role': userRole
-          },
-          body: JSON.stringify(newItem)
-        });
-
-        if (res.ok) {
-          const serverDoc = await res.json();
-          if (serverDoc && serverDoc.id) {
-            setDocuments(prev => {
-              const next = prev.map(d => d.id === newItem.id ? serverDoc : d);
-              safeSaveToLocalStorage('earsip_documents', next);
-              return next;
-            });
-          }
-        }
-        fetchLogs();
-      } catch (err) {
-        console.warn('Backend POST sync error:', err);
-      }
+    } catch (err) {
+      console.error('Error saving document to Firestore:', err);
+      alert('Gagal menyimpan dokumen ke Firebase Firestore.');
     }
   };
 
   const handleQuickStatusChange = async (id: string, newStatus: DocumentStatus) => {
-    setDocuments(prev => {
-      const next = prev.map(d => d.id === id ? { ...d, status: newStatus } : d);
-      safeSaveToLocalStorage('earsip_documents', next);
-      return next;
-    });
+    const targetDoc = documents.find(d => d.id === id);
+    if (!targetDoc) return;
 
     try {
-      await fetch(`/api/documents/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin',
-          'x-user-role': currentUser?.role || 'master_admin'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      fetchLogs();
+      const updatedItem = {
+        ...targetDoc,
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser?.name || 'Admin'
+      };
+      await setDoc(doc(db, 'documents', id), updatedItem);
+      await logActionToFirestore('Ubah Status', `Mengubah status dokumen "${targetDoc.masterRegulasi}" menjadi ${newStatus}`);
     } catch (err) {
-      console.warn('Status change sync error:', err);
+      console.error('Error updating status in Firestore:', err);
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus dokumen regulasi ini?')) return;
-
-    setDocuments(prev => {
-      const next = prev.filter(d => d.id !== id);
-      safeSaveToLocalStorage('earsip_documents', next);
-      return next;
-    });
+    const targetDoc = documents.find(d => d.id === id);
+    if (!confirm(`Apakah Anda yakin ingin menghapus dokumen "${targetDoc?.masterRegulasi || id}"?`)) return;
 
     try {
-      await fetch(`/api/documents/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin',
-          'x-user-role': currentUser?.role || 'master_admin'
-        }
-      });
-      fetchLogs();
+      await deleteDoc(doc(db, 'documents', id));
+      await logActionToFirestore('Hapus Dokumen', `Menghapus dokumen: ${targetDoc?.masterRegulasi || id}`);
     } catch (err) {
-      console.warn('Backend DELETE sync error:', err);
+      console.error('Error deleting document from Firestore:', err);
     }
   };
 
@@ -434,30 +372,26 @@ export default function App() {
         return;
       }
 
-      const confirmImport = confirm(`Apakah Anda yakin ingin mengimpor ${importedDocs.length} data regulasi dari file backup ini? Data di server dan seluruh komputer pengguna lain akan langsung diperbarui.`);
+      const confirmImport = confirm(`Apakah Anda yakin ingin mengimpor ${importedDocs.length} data regulasi dari file backup ini? Data di Firebase cloud server dan seluruh komputer pengguna lain akan langsung diperbarui secara otomatis.`);
       if (!confirmImport) return;
 
-      const res = await fetch('/api/documents/sync-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin',
-          'x-user-role': currentUser?.role || 'master_admin'
-        },
-        body: JSON.stringify({ documents: importedDocs })
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        alert(`Berhasil mengimpor dan menyinkronkan ${result.total || importedDocs.length} data regulasi ke database server!`);
-        fetchDocuments();
-        fetchLogs();
-      } else {
-        alert('Gagal menyinkronkan data impor ke server.');
+      const chunkSize = 400;
+      for (let i = 0; i < importedDocs.length; i += chunkSize) {
+        const chunk = importedDocs.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((item: DocumentItem) => {
+          if (item.id) {
+            const itemRef = doc(db, 'documents', item.id);
+            batch.set(itemRef, item);
+          }
+        });
+        await batch.commit();
       }
+
+      await logActionToFirestore('Impor Database', `Mengimpor ${importedDocs.length} dokumen regulasi ke Firebase Firestore.`);
+      alert(`Berhasil mengimpor ${importedDocs.length} data regulasi ke Firebase Cloud Server! Seluruh pengguna di komputer lain sekarang dapat melihat data terbaru secara otomatis.`);
     } catch (err) {
-      console.error('Error importing JSON backup:', err);
+      console.error('Error importing JSON backup to Firestore:', err);
       alert('Format file JSON tidak valid.');
     }
   };
@@ -465,65 +399,52 @@ export default function App() {
   // User Management Operations (Admin)
   const handleAddUser = async (userData: any) => {
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin'
-        },
-        body: JSON.stringify(userData)
-      });
-      if (res.ok) {
-        fetchUsers();
-        fetchLogs();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Gagal menambahkan user');
-      }
+      const newId = `usr-${Date.now()}`;
+      const newUser: User = {
+        id: newId,
+        username: userData.username,
+        name: userData.name,
+        email: userData.email || `${userData.username}@tabalongkab.go.id`,
+        role: userData.role || 'operator_bidang',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'users', newId), newUser);
+      await logActionToFirestore('Tambah Pengguna', `Menambahkan pengguna baru: ${newUser.name}`);
+      alert('Pengguna berhasil ditambahkan!');
     } catch (err) {
-      console.error('Error adding user:', err);
+      console.error('Error adding user to Firestore:', err);
+      alert('Gagal menambahkan pengguna.');
     }
   };
 
   const handleUpdateUser = async (id: string, userData: any) => {
     try {
-      const res = await fetch(`/api/users/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin'
-        },
-        body: JSON.stringify(userData)
-      });
-      if (res.ok) {
-        fetchUsers();
-        fetchLogs();
-      }
+      const existingUser = users.find(u => u.id === id);
+      if (!existingUser) return;
+
+      const updatedUser: User = {
+        ...existingUser,
+        ...userData
+      };
+
+      await setDoc(doc(db, 'users', id), updatedUser);
+      await logActionToFirestore('Ubah Pengguna', `Memperbarui data pengguna: ${updatedUser.name}`);
     } catch (err) {
-      console.error('Error updating user:', err);
+      console.error('Error updating user in Firestore:', err);
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     try {
-      const res = await fetch(`/api/users/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-user-name': currentUser?.name || 'Admin',
-          'x-user-id': currentUser?.id || 'usr-admin'
-        }
-      });
-      if (res.ok) {
-        fetchUsers();
-        fetchLogs();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Gagal menghapus user');
-      }
+      const targetUser = users.find(u => u.id === id);
+      if (!confirm(`Hapus pengguna ${targetUser?.name || id}?`)) return;
+
+      await deleteDoc(doc(db, 'users', id));
+      await logActionToFirestore('Hapus Pengguna', `Menghapus pengguna: ${targetUser?.name || id}`);
     } catch (err) {
-      console.error('Error deleting user:', err);
+      console.error('Error deleting user from Firestore:', err);
     }
   };
 

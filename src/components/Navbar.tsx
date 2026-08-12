@@ -130,6 +130,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right User Badge & Stats */}
           <div className="flex items-center gap-3">
             
+            {/* Cloud Sync Status Badge */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-950/80 border border-emerald-700/80 text-emerald-300 rounded-full text-xs font-medium shadow-sm" title="Tersambung ke Firebase Firestore Realtime Cloud Server">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="hidden md:inline">Cloud Realtime Sync</span>
+            </div>
+
             {/* Quick Stat Pill */}
             <div className="hidden xl:flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1 rounded-full text-xs text-slate-300">
               <FileCheck2 size={14} className="text-teal-400" />

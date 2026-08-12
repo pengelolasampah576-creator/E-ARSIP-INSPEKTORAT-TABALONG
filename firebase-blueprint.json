@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Document": {
+      "title": "Document Item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "no": { "type": "number" },
+        "nomorPeraturan": { "type": "string" },
+        "judulPeraturan": { "type": "string" },
+        "tipeDokumen": { "type": "string" },
+        "instansi": { "type": "string" },
+        "kategoriBadan Hukum": { "type": "string" },
+        "tahun": { "type": "number" },
+        "tanggalPenetapan": { "type": "string" },
+        "tanggalPengundangan": { "type": "string" },
+        "status": { "type": "string" },
+        "keteranganStatus": { "type": "string" },
+        "subjek": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "fileType": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "nomorPeraturan", "judulPeraturan", "tipeDokumen"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log Item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "role": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "action", "timestamp"]
+    },
+    "User": {
+      "title": "System User",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string" },
+        "skpd": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "username", "role"]
+    }
+  },
+  "collections": {
+    "documents": {
+      "entityName": "Document"
+    },
+    "activity_logs": {
+      "entityName": "ActivityLog"
+    },
+    "users": {
+      "entityName": "User"
+    }
+  }
+}
