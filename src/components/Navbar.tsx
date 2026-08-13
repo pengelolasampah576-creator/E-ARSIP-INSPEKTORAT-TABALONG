@@ -190,11 +190,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {onResetData && (
               <button
                 onClick={onResetData}
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-950/50 hover:bg-rose-900/80 text-rose-300 rounded-lg text-xs font-medium border border-rose-800/60 transition-all"
-                title="Kosongkan Semua Data Contoh Regulasi untuk Pengisian Baru"
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-950/50 hover:bg-emerald-900/80 text-emerald-300 rounded-lg text-xs font-medium border border-emerald-800/60 transition-all"
+                title="Pulihkan / Inisialisasi Ulang Daftar Master Regulasi Utama Inspektorat Tabalong"
               >
-                <Trash2 size={14} className="text-rose-400" />
-                <span className="hidden xl:inline">Kosongkan Data</span>
+                <RefreshCw size={14} className="text-emerald-400" />
+                <span className="hidden xl:inline">Pulihkan Master Data</span>
               </button>
             )}
 

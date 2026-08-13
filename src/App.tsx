@@ -119,23 +119,6 @@ export default function App() {
     const docsRef = collection(db, 'documents');
     const unsubscribeDocs = onSnapshot(docsRef, async (snapshot) => {
       if (!snapshot.empty) {
-        // If auto-purge hasn't run yet, clean out existing example documents
-        if (!localStorage.getItem('earsip_purged_examples')) {
-          localStorage.setItem('earsip_purged_examples', 'true');
-          try {
-            const batch = writeBatch(db);
-            snapshot.forEach((dSnap) => {
-              batch.delete(doc(db, 'documents', dSnap.id));
-            });
-            await batch.commit();
-          } catch (e) {
-            console.error('Error auto purging example docs:', e);
-          }
-          setDocuments([]);
-          safeSaveToLocalStorage('earsip_documents', []);
-          return;
-        }
-
         const docsList: DocumentItem[] = [];
         snapshot.forEach((docSnap) => {
           docsList.push(docSnap.data() as DocumentItem);
@@ -144,9 +127,19 @@ export default function App() {
         setDocuments(docsList);
         safeSaveToLocalStorage('earsip_documents', docsList);
       } else {
-        localStorage.setItem('earsip_purged_examples', 'true');
-        setDocuments([]);
-        safeSaveToLocalStorage('earsip_documents', []);
+        // If Firestore is empty, seed with initial master regulations
+        try {
+          const batch = writeBatch(db);
+          INITIAL_DOCUMENTS.forEach((item) => {
+            const itemRef = doc(db, 'documents', item.id);
+            batch.set(itemRef, item);
+          });
+          await batch.commit();
+        } catch (e) {
+          console.error('Error seeding initial documents into Firestore:', e);
+          setDocuments([]);
+          safeSaveToLocalStorage('earsip_documents', []);
+        }
       }
     }, (err) => {
       console.error('Firestore documents onSnapshot error:', err);
@@ -483,10 +476,15 @@ export default function App() {
   };
 
   const handleResetAllDocuments = async () => {
-    if (!confirm('Apakah Anda yakin ingin mengosongkan SELURUH data contoh regulasi? Data di database cloud dan tampilan aplikasi akan langsung menjadi kosong untuk diisi dengan data regulasi yang sebenarnya.')) {
-      return;
-    }
+    const choice = confirm(
+      'Pilih tindakan:\n\n' +
+      '[OK] - Pulihkan / Inisialisasi Ulang Daftar Master Regulasi (25 Regulasi Utama Inspektorat Tabalong)\n' +
+      '[Batal] - Batal\n'
+    );
+    if (!choice) return;
+
     try {
+      // Clear existing docs
       const docsSnapshot = await getDocs(collection(db, 'documents'));
       if (!docsSnapshot.empty) {
         const batch = writeBatch(db);
@@ -495,14 +493,20 @@ export default function App() {
         });
         await batch.commit();
       }
-      setDocuments([]);
-      localStorage.removeItem('earsip_documents');
-      localStorage.setItem('earsip_purged_examples', 'true');
-      await logActionToFirestore('Kosongkan Data', 'Mengosongkan seluruh data regulasi contoh untuk pengisian data regulasi aktual.');
-      alert('Berhasil mengosongkan seluruh data regulasi! Aplikasi sekarang bersih dan siap diisi dengan regulasi aktual.');
+
+      // Re-seed INITIAL_DOCUMENTS
+      const batch2 = writeBatch(db);
+      INITIAL_DOCUMENTS.forEach((item) => {
+        const itemRef = doc(db, 'documents', item.id);
+        batch2.set(itemRef, item);
+      });
+      await batch2.commit();
+
+      await logActionToFirestore('Reset Master Regulasi', 'Memulihkan daftar master regulasi Inspektorat Tabalong.');
+      alert('Berhasil memulihkan daftar Master Regulasi Inspektorat Tabalong!');
     } catch (err) {
       console.error('Error resetting documents in Firestore:', err);
-      alert('Gagal mengosongkan data dari database cloud.');
+      alert('Gagal memulihkan data regulasi.');
     }
   };
 
