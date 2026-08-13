@@ -87,13 +87,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 flex items-center justify-center">
-                <img 
-                  src={LOGO_URL} 
-                  alt="Logo e-Arsip" 
-                  className="w-full h-full object-contain filter drop-shadow-md"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[9px] sm:text-[10px] font-bold text-amber-300 tracking-tight whitespace-nowrap leading-none mb-1 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Copyright by @2026_WG Corp.
+                </span>
+                <div className="w-11 h-11 sm:w-13 sm:h-13 flex-shrink-0 flex items-center justify-center">
+                  <img 
+                    src={LOGO_URL} 
+                    alt="Logo e-Arsip" 
+                    className="w-full h-full object-contain filter drop-shadow-md"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
               </div>
               <div>
                 <div className="flex items-center gap-2">

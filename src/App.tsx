@@ -896,6 +896,11 @@ export default function App() {
 
         </main>
 
+        {/* FOOTER */}
+        <footer className="mt-8 py-3 px-6 border-t border-slate-200 bg-white text-center text-xs font-medium text-slate-500 print:hidden">
+          <p>E-ARSIP MASTER REGULASI INSPEKTORAT KABUPATEN TABALONG</p>
+        </footer>
+
       </div>
 
       {/* Modals */}
