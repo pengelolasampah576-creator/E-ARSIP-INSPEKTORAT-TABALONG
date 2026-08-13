@@ -136,7 +136,13 @@ export default function App() {
     const unsubscribeDocs = onSnapshot(docsRef, async (snapshot) => {
       if (!snapshot.empty) {
         setDocuments((prevDocs) => {
-          const docsList: DocumentItem[] = [];
+          const docsMap = new Map<string, DocumentItem>();
+
+          // Pre-populate with initial 131 master regulations so all 131 items exist
+          INITIAL_DOCUMENTS.forEach((item) => {
+            docsMap.set(item.id, item);
+          });
+
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as DocumentItem;
             const prevDoc = prevDocs.find((p) => p.id === data.id);
@@ -153,25 +159,49 @@ export default function App() {
               }
             }
 
-            docsList.push(data);
+            docsMap.set(data.id, data);
           });
+
+          const docsList = Array.from(docsMap.values());
           docsList.sort((a, b) => (a.no || 0) - (b.no || 0));
           safeSaveToLocalStorage('earsip_documents', docsList);
           return docsList;
         });
+
+        // Auto-seed missing master regulations if existing Firestore dataset is smaller than INITIAL_DOCUMENTS (131)
+        if (snapshot.size < INITIAL_DOCUMENTS.length) {
+          try {
+            const batch = writeBatch(db);
+            let missingCount = 0;
+            const existingIds = new Set(snapshot.docs.map((d) => d.id));
+
+            INITIAL_DOCUMENTS.forEach((item) => {
+              if (!existingIds.has(item.id)) {
+                batch.set(doc(db, 'documents', item.id), sanitizeForFirestore(item));
+                missingCount++;
+              }
+            });
+
+            if (missingCount > 0) {
+              await batch.commit();
+            }
+          } catch (e) {
+            console.warn('Auto-seeding missing master regulations into Firestore:', e);
+          }
+        }
       } else {
         // If Firestore is empty, seed with initial master regulations
         try {
           const batch = writeBatch(db);
           INITIAL_DOCUMENTS.forEach((item) => {
             const itemRef = doc(db, 'documents', item.id);
-            batch.set(itemRef, item);
+            batch.set(itemRef, sanitizeForFirestore(item));
           });
           await batch.commit();
         } catch (e) {
           console.error('Error seeding initial documents into Firestore:', e);
-          setDocuments([]);
-          safeSaveToLocalStorage('earsip_documents', []);
+          setDocuments(INITIAL_DOCUMENTS);
+          safeSaveToLocalStorage('earsip_documents', INITIAL_DOCUMENTS);
         }
       }
     }, (err) => {
@@ -634,7 +664,7 @@ export default function App() {
   const handleResetAllDocuments = async () => {
     const choice = confirm(
       'Pilih tindakan:\n\n' +
-      '[OK] - Pulihkan / Inisialisasi Ulang Daftar Master Regulasi (25 Regulasi Utama Inspektorat Tabalong)\n' +
+      '[OK] - Pulihkan / Inisialisasi Ulang Daftar Master Regulasi (131 Master Regulasi Utama Inspektorat Tabalong)\n' +
       '[Batal] - Batal\n'
     );
     if (!choice) return;
@@ -654,12 +684,15 @@ export default function App() {
       const batch2 = writeBatch(db);
       INITIAL_DOCUMENTS.forEach((item) => {
         const itemRef = doc(db, 'documents', item.id);
-        batch2.set(itemRef, item);
+        batch2.set(itemRef, sanitizeForFirestore(item));
       });
       await batch2.commit();
 
-      await logActionToFirestore('Reset Master Regulasi', 'Memulihkan daftar master regulasi Inspektorat Tabalong.');
-      alert('Berhasil memulihkan daftar Master Regulasi Inspektorat Tabalong!');
+      setDocuments(INITIAL_DOCUMENTS);
+      safeSaveToLocalStorage('earsip_documents', INITIAL_DOCUMENTS);
+
+      await logActionToFirestore('Reset Master Regulasi', 'Memulihkan daftar master regulasi Inspektorat Tabalong (131 Dokumen).');
+      alert('Berhasil memulihkan daftar Master Regulasi Inspektorat Tabalong (131 Master Regulasi)!');
     } catch (err) {
       console.error('Error resetting documents in Firestore:', err);
       alert('Gagal memulihkan data regulasi.');
