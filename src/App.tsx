@@ -16,6 +16,7 @@ import { TargetModal } from './components/TargetModal';
 import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
 import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch, getDocs } from './lib/firebase';
+import { saveFileToIndexedDB, getFileFromIndexedDB } from './utils/fileStorage';
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -134,13 +135,30 @@ export default function App() {
     const docsRef = collection(db, 'documents');
     const unsubscribeDocs = onSnapshot(docsRef, async (snapshot) => {
       if (!snapshot.empty) {
-        const docsList: DocumentItem[] = [];
-        snapshot.forEach((docSnap) => {
-          docsList.push(docSnap.data() as DocumentItem);
+        setDocuments((prevDocs) => {
+          const docsList: DocumentItem[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as DocumentItem;
+            const prevDoc = prevDocs.find((p) => p.id === data.id);
+
+            // Clean up old corrupted URL strings if present
+            if (data.fileUrl && data.fileUrl.includes('...[stored-locally]')) {
+              data.fileUrl = '';
+            }
+
+            // If incoming fileUrl from Firestore is marker or empty, preserve valid local in-memory fileUrl
+            if (!data.fileUrl || data.fileUrl.startsWith('indexeddb:')) {
+              if (prevDoc?.fileUrl && (prevDoc.fileUrl.startsWith('data:') || prevDoc.fileUrl.startsWith('/uploads/') || prevDoc.fileUrl.startsWith('blob:'))) {
+                data.fileUrl = prevDoc.fileUrl;
+              }
+            }
+
+            docsList.push(data);
+          });
+          docsList.sort((a, b) => (a.no || 0) - (b.no || 0));
+          safeSaveToLocalStorage('earsip_documents', docsList);
+          return docsList;
         });
-        docsList.sort((a, b) => (a.no || 0) - (b.no || 0));
-        setDocuments(docsList);
-        safeSaveToLocalStorage('earsip_documents', docsList);
       } else {
         // If Firestore is empty, seed with initial master regulations
         try {
@@ -328,7 +346,7 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
-  // Helper to ensure an object has no undefined fields for Firestore and no oversized base64 strings
+  // Helper to ensure an object has no undefined fields for Firestore and uses IndexedDB marker for oversized base64 strings
   const sanitizeForFirestore = <T extends Record<string, any>>(obj: T): T => {
     const clean: Record<string, any> = {};
     Object.keys(obj).forEach((key) => {
@@ -336,10 +354,14 @@ export default function App() {
       clean[key] = val === undefined ? '' : val;
     });
 
-    // Check if fileUrl is a huge base64 string (> 750,000 characters, exceeds Firestore 1MB doc limit)
-    if (typeof clean.fileUrl === 'string' && clean.fileUrl.startsWith('data:') && clean.fileUrl.length > 750000) {
-      console.warn('File base64 size exceeds Firestore 1MB document limit. Storing metadata with safe URL marker.');
-      clean.fileUrl = clean.fileUrl.substring(0, 100) + '...[stored-locally]';
+    // Check if fileUrl is a huge base64 string (> 500,000 characters, exceeds Firestore 1MB doc limit)
+    if (typeof clean.fileUrl === 'string' && clean.fileUrl.startsWith('data:') && clean.fileUrl.length > 500000) {
+      if (clean.id) {
+        saveFileToIndexedDB(clean.id, clean.fileUrl);
+        clean.fileUrl = `indexeddb:${clean.id}`;
+      } else {
+        clean.fileUrl = '';
+      }
     }
 
     return clean as T;
@@ -351,15 +373,20 @@ export default function App() {
 
     setIsDocModalOpen(false);
 
-    // 1. Try uploading base64 file to server /api/upload if needed
     let fileUrlToSave = docData.fileUrl || '';
     let fileNameToSave = docData.fileName || '';
     let fileSizeToSave = docData.fileSize || '';
 
+    let targetDocId = editingDoc ? editingDoc.id : `doc-${Date.now()}`;
+
+    // 1. If base64 file, save to IndexedDB for reliable offline / local previewing
     if (fileUrlToSave.startsWith('data:')) {
+      await saveFileToIndexedDB(targetDocId, fileUrlToSave);
+
+      // Try uploading base64 file to server /api/upload if server is reachable
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         const res = await fetch('/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -380,15 +407,13 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.warn('Server upload API unavailable or timed out, preserving local file state:', err);
+        console.warn('Server upload API unavailable or timed out, preserving local IndexedDB file state:', err);
       }
     }
 
-    let targetDocId = '';
     let itemToSave: DocumentItem;
 
     if (editingDoc) {
-      targetDocId = editingDoc.id;
       itemToSave = {
         ...editingDoc,
         ...docData,
@@ -401,7 +426,6 @@ export default function App() {
       setEditingDoc(null);
     } else {
       const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
-      targetDocId = `doc-${Date.now()}`;
       itemToSave = {
         id: targetDocId,
         no: maxNo + 1,

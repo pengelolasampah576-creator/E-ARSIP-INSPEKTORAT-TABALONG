@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DocumentItem, UserRole } from '../types';
+import { getFileFromIndexedDB, dataURLToBlobURL } from '../utils/fileStorage';
 import { 
   X, 
   FileText, 
@@ -33,8 +34,69 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   onOpenAi
 }) => {
   const [showInlinePreview, setShowInlinePreview] = useState<boolean>(false);
+  const [activeFileUrl, setActiveFileUrl] = useState<string>('');
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let createdBlobUrl: string | null = null;
+
+    async function loadFile() {
+      if (!doc) {
+        setActiveFileUrl('');
+        setBlobUrl(null);
+        return;
+      }
+
+      setIsLoadingFile(true);
+      let rawUrl = doc.fileUrl || '';
+
+      // Clean up corrupted string markers if any
+      if (rawUrl.includes('...[stored-locally]')) {
+        rawUrl = '';
+      }
+
+      // Check IndexedDB if url marker or empty
+      if (rawUrl.startsWith('indexeddb:') || (!rawUrl && doc.id)) {
+        const localData = await getFileFromIndexedDB(doc.id);
+        if (localData && isMounted) {
+          rawUrl = localData;
+        }
+      }
+
+      if (!isMounted) return;
+
+      if (rawUrl.startsWith('data:')) {
+        const bUrl = dataURLToBlobURL(rawUrl);
+        if (bUrl) {
+          createdBlobUrl = bUrl;
+          setBlobUrl(bUrl);
+          setActiveFileUrl(bUrl);
+        } else {
+          setActiveFileUrl(rawUrl);
+        }
+      } else {
+        setActiveFileUrl(rawUrl);
+      }
+
+      setIsLoadingFile(false);
+    }
+
+    loadFile();
+
+    return () => {
+      isMounted = false;
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+    };
+  }, [doc]);
 
   if (!doc) return null;
+
+  const previewSource = blobUrl || activeFileUrl;
+
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -171,7 +233,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             </div>
 
             {/* Separate View & Download Action Buttons */}
-            {doc.fileUrl ? (
+            {previewSource ? (
               <div className="pt-2 border-t border-slate-200 flex items-center gap-2 flex-wrap">
                 {/* 1. MELIHAT / BUKA BERKAS */}
                 <button
@@ -188,7 +250,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                 </button>
 
                 <a 
-                  href={doc.fileUrl}
+                  href={previewSource}
                   target="_blank"
                   rel="noreferrer"
                   className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
@@ -199,7 +261,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
 
                 {/* 2. MENDOWNLOAD BERKAS */}
                 <a 
-                  href={doc.fileUrl}
+                  href={previewSource}
                   download={doc.fileName || 'dokumen.pdf'}
                   className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow transition-colors ml-auto"
                 >
@@ -209,25 +271,32 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               </div>
             ) : (
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                <span className="text-xs text-slate-500 italic">Belum ada berkas terunggah</span>
-                <button 
-                  onClick={() => alert(`Belum ada berkas terunggah untuk "${doc.masterRegulasi}". Silakan klik "Edit" di kanan bawah untuk mengunggah dokumen digital (PDF/DOCX).`)}
-                  className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1"
-                >
-                  <Download size={13} /> Belum Ada Berkas
-                </button>
+                <span className="text-xs text-slate-500 italic">
+                  {isLoadingFile ? 'Memuat berkas dokumen...' : 'Belum ada berkas terunggah'}
+                </span>
+                {userRole !== 'viewer' && onEdit && (
+                  <button 
+                    onClick={() => {
+                      onClose();
+                      onEdit(doc);
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1"
+                  >
+                    <Edit3 size={13} /> Unggah Berkas
+                  </button>
+                )}
               </div>
             )}
 
             {/* Embedded Inline Document Previewer Frame */}
-            {doc.fileUrl && showInlinePreview && (
+            {previewSource && showInlinePreview && (
               <div className="mt-3 rounded-lg overflow-hidden border border-slate-300 bg-slate-900 shadow-inner">
                 <div className="p-2 bg-slate-800 text-slate-300 text-[11px] font-mono flex items-center justify-between border-b border-slate-700 px-3">
                   <span className="flex items-center gap-1.5 text-amber-400 font-sans font-semibold">
                     <Eye size={13} /> Pratinjau Dokumen Digital
                   </span>
                   <a
-                    href={doc.fileUrl}
+                    href={previewSource}
                     target="_blank"
                     rel="noreferrer"
                     className="hover:underline flex items-center gap-1 text-slate-400 hover:text-white"
@@ -236,9 +305,9 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                   </a>
                 </div>
                 <iframe
-                  src={doc.fileUrl}
+                  src={previewSource}
                   title="Pratinjau Dokumen"
-                  className="w-full h-80 bg-white"
+                  className="w-full h-96 bg-white"
                 />
               </div>
             )}
