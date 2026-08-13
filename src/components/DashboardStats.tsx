@@ -92,7 +92,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
               <ShieldCheck size={14} /> DOKUMEN INVENTORI REGULASI TABALONG
             </div>
             <h1 className="text-2xl font-black tracking-tight">
-              Dashboard Kepatuhan & Target PemENUHAn Regulasi
+              Dashboard Kepatuhan & Target Pemenuhan Regulasi
             </h1>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
               Analisis persentase ketersediaan Peraturan Bupati, Kebijakan, Pedoman, dan SOP. Selama seluruh target bidang belum terpenuhi, nilai kepatuhan tidak akan mencapai 100% sempurna.

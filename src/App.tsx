@@ -49,15 +49,17 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   
-  // Active User session (default to master admin for seamless access, but allow easy switching!)
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'usr-admin',
-    username: 'admin',
-    name: 'Administrator Utama (Master)',
-    email: 'admin.inspektorat@tabalongkab.go.id',
-    role: 'master_admin',
-    status: 'active',
-    createdAt: '2025-01-01T00:00:00Z'
+  // Active User session (check localStorage for saved session; default to null for unauthenticated new visitors)
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('earsip_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (err) {
+        console.error('Error parsing stored user session:', err);
+      }
+    }
+    return null;
   });
 
   // UI Navigation states
@@ -70,8 +72,10 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState('Semua Status');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modals
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  // Modals - Open login modal immediately if no user session exists
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => {
+    return !localStorage.getItem('earsip_user');
+  });
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<DocumentItem | null>(null);
   const [viewingDoc, setViewingDoc] = useState<DocumentItem | null>(null);
@@ -126,9 +130,13 @@ export default function App() {
     if (savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser));
+        setIsLoginModalOpen(false);
       } catch (err) {
         console.error('Error parsing stored user session:', err);
+        setIsLoginModalOpen(true);
       }
+    } else {
+      setIsLoginModalOpen(true);
     }
 
     // 1. Subscribe to Documents Collection Realtime

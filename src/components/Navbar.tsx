@@ -87,18 +87,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <div className="flex items-center gap-3.5">
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-[9px] sm:text-[10px] font-bold text-amber-300 tracking-tight whitespace-nowrap leading-none mb-1 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Copyright by @2026_WG Corp.
-                </span>
-                <div className="w-11 h-11 sm:w-13 sm:h-13 flex-shrink-0 flex items-center justify-center">
-                  <img 
-                    src={LOGO_URL} 
-                    alt="Logo e-Arsip" 
-                    className="w-full h-full object-contain filter drop-shadow-md"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+              <div className="w-11 h-11 sm:w-13 sm:h-13 flex-shrink-0 flex items-center justify-center">
+                <img 
+                  src={LOGO_URL} 
+                  alt="Logo e-Arsip" 
+                  className="w-full h-full object-contain filter drop-shadow-md"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -111,6 +106,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300 font-semibold truncate max-w-[200px] sm:max-w-none">
                   Inspektorat Daerah Kabupaten Tabalong
+                </p>
+                <p className="text-[10px] sm:text-xs font-bold text-amber-300 tracking-tight leading-tight mt-0.5">
+                  Copyright by @2026_WG Corp.
                 </p>
               </div>
             </div>
