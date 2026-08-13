@@ -16,7 +16,8 @@ import {
   Download,
   Upload,
   Database,
-  Trash2
+  Trash2,
+  Target
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -36,6 +37,7 @@ interface NavbarProps {
   onExportBackup?: () => void;
   onImportBackup?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetData?: () => void;
+  onOpenTargetModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,7 +52,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRefresh,
   onExportBackup,
   onImportBackup,
-  onResetData
+  onResetData,
+  onOpenTargetModal
 }) => {
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -71,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
       <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="flex items-center justify-between h-20 gap-4">
           
           {/* Left branding */}
           <div className="flex items-center gap-3">
@@ -83,25 +86,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Menu size={22} />
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 p-0.5 border border-amber-500/30 flex-shrink-0 shadow-inner">
+            <div className="flex items-center gap-3.5">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 flex items-center justify-center">
                 <img 
                   src={LOGO_URL} 
                   alt="Logo e-Arsip" 
-                  className="w-full h-full object-cover rounded"
+                  className="w-full h-full object-contain filter drop-shadow-md"
                   referrerPolicy="no-referrer"
                 />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-amber-200 via-white to-teal-200 bg-clip-text text-transparent">
+                  <span className="font-extrabold text-xl sm:text-2xl tracking-tight bg-gradient-to-r from-amber-200 via-white to-teal-200 bg-clip-text text-transparent">
                     e-Arsip
                   </span>
-                  <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full">
+                  <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full">
                     Inspektorat
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-medium truncate max-w-[200px] sm:max-w-none">
+                <p className="text-xs sm:text-sm text-slate-300 font-semibold truncate max-w-[200px] sm:max-w-none">
                   Inspektorat Daerah Kabupaten Tabalong
                 </p>
               </div>
@@ -185,6 +188,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="hidden"
                 />
               </label>
+            )}
+
+            {onOpenTargetModal && (
+              <button
+                onClick={onOpenTargetModal}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold border border-amber-500/40 transition-all"
+                title="Kelola & Atur Target Dokumen Per Bidang"
+              >
+                <Target size={14} className="text-amber-400" />
+                <span className="hidden xl:inline">Target Bidang</span>
+              </button>
             )}
 
             {onResetData && (

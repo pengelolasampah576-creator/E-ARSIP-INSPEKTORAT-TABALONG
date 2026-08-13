@@ -386,13 +386,35 @@ export const BIDANG_LIST = [
   'SDM',
   'Kesekretariatan',
   'Keuangan',
-  'Barang Milik',
+  'Barang Milik Daerah',
   'SPBE',
   'Perencanaan',
   'Penganggaran',
   'Pelaporan',
   'Integritas'
 ];
+
+export const DEFAULT_BIDANG_TARGETS: Record<string, number> = {
+  'Pengawasan': 20,
+  'Reviu': 7,
+  'Evaluasi': 5,
+  'Pemantauan': 3,
+  'Konsultansi': 6,
+  'SOP Pengawasan': 10,
+  'SOP Audit TIK': 5,
+  'Manajemen Risiko': 5,
+  'SPIP': 3,
+  'Mutu': 5,
+  'SDM': 7,
+  'Kesekretariatan': 5,
+  'Keuangan': 4,
+  'Barang Milik Daerah': 2,
+  'SPBE': 6,
+  'Perencanaan': 10,
+  'Penganggaran': 12,
+  'Pelaporan': 10,
+  'Integritas': 6
+};
 
 export const JENIS_DOKUMEN_LIST = [
   'Semua Jenis',
@@ -401,3 +423,4 @@ export const JENIS_DOKUMEN_LIST = [
   'Pedoman',
   'SOP'
 ];
+

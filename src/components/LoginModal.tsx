@@ -55,11 +55,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <X size={20} />
           </button>
 
-          <div className="w-14 h-14 rounded-2xl bg-white/10 p-1 mx-auto mb-3 border border-amber-500/40 shadow-inner flex items-center justify-center">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-3 flex items-center justify-center">
             <img 
               src={LOGO_URL} 
               alt="Logo e-Arsip" 
-              className="w-full h-full object-cover rounded-xl"
+              className="w-full h-full object-contain filter drop-shadow-lg"
               referrerPolicy="no-referrer"
             />
           </div>

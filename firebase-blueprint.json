@@ -52,6 +52,16 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "name", "username", "role"]
+    },
+    "Setting": {
+      "title": "App Setting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targets": { "type": "object" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      }
     }
   },
   "collections": {
@@ -63,6 +73,9 @@
     },
     "users": {
       "entityName": "User"
+    },
+    "settings": {
+      "entityName": "Setting"
     }
   }
 }

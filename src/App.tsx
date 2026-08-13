@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { DocumentItem, DocumentStatus, User, UserRole, AuditLog } from './types';
-import { INITIAL_DOCUMENTS, INITIAL_USERS, BIDANG_LIST, JENIS_DOKUMEN_LIST } from './data/initialData';
+import { DocumentItem, DocumentStatus, User, UserRole, AuditLog, BidangTargets } from './types';
+import { INITIAL_DOCUMENTS, INITIAL_USERS, BIDANG_LIST, JENIS_DOKUMEN_LIST, DEFAULT_BIDANG_TARGETS } from './data/initialData';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { DocumentMatrix } from './components/DocumentMatrix';
@@ -12,6 +12,7 @@ import { UserManagement } from './components/UserManagement';
 import { AuditLogView } from './components/AuditLogView';
 import { AiAssistantModal } from './components/AiAssistantModal';
 import { LoginModal } from './components/LoginModal';
+import { TargetModal } from './components/TargetModal';
 import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
 import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch, getDocs } from './lib/firebase';
@@ -30,8 +31,22 @@ export default function App() {
     return INITIAL_DOCUMENTS;
   });
 
+  const [targets, setTargets] = useState<BidangTargets>(() => {
+    const saved = localStorage.getItem('earsip_targets');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {
+        console.error('Error parsing stored targets:', e);
+      }
+    }
+    return DEFAULT_BIDANG_TARGETS;
+  });
+
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   
   // Active User session (default to master admin for seamless access, but allow easy switching!)
   const [currentUser, setCurrentUser] = useState<User | null>({
@@ -185,12 +200,53 @@ export default function App() {
       console.error('Firestore logs onSnapshot error:', err);
     });
 
+    // 4. Subscribe to Target Settings Realtime
+    const targetsDocRef = doc(db, 'settings', 'targets');
+    const unsubscribeTargets = onSnapshot(targetsDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.targets) {
+          setTargets(data.targets);
+          safeSaveToLocalStorage('earsip_targets', data.targets);
+        }
+      } else {
+        // Seed Firestore with DEFAULT_BIDANG_TARGETS
+        setDoc(doc(db, 'settings', 'targets'), {
+          targets: DEFAULT_BIDANG_TARGETS,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'System'
+        }).catch(err => console.error('Error seeding default targets:', err));
+      }
+    }, (err) => {
+      console.error('Firestore targets onSnapshot error:', err);
+    });
+
     return () => {
       unsubscribeDocs();
       unsubscribeUsers();
       unsubscribeLogs();
+      unsubscribeTargets();
     };
   }, []);
+
+  // Save targets to Firestore
+  const handleSaveTargets = async (newTargets: BidangTargets) => {
+    setTargets(newTargets);
+    safeSaveToLocalStorage('earsip_targets', newTargets);
+
+    try {
+      await setDoc(doc(db, 'settings', 'targets'), {
+        targets: newTargets,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser?.name || 'Admin'
+      });
+      await logActionToFirestore('Update Target Bidang', 'Memperbarui target kuantitas regulasi per bidang.');
+      alert('Target bidang berhasil disimpan dan disinkronkan ke database!');
+    } catch (err) {
+      console.error('Error saving targets to Firestore:', err);
+      alert('Gagal menyimpan target ke Firestore.');
+    }
+  };
 
   const fetchDocuments = () => {
     // Legacy refresh trigger helper
@@ -535,6 +591,7 @@ export default function App() {
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
         onResetData={handleResetAllDocuments}
+        onOpenTargetModal={() => setIsTargetModalOpen(true)}
       />
 
       {/* Main Layout Area */}
@@ -648,10 +705,12 @@ export default function App() {
             <DashboardStats
               documents={documents}
               bidangList={BIDANG_LIST}
+              targets={targets}
               onSelectBidangFilter={(b) => {
                 setSelectedBidang(b);
                 setActiveTab('matrix');
               }}
+              onOpenTargetModal={() => setIsTargetModalOpen(true)}
             />
           )}
 
@@ -741,6 +800,15 @@ export default function App() {
         onClose={() => setIsAiModalOpen(false)}
         documents={documents}
         selectedDocForAi={docForAi}
+      />
+
+      <TargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        targets={targets}
+        onSaveTargets={handleSaveTargets}
+        documents={documents}
+        bidangList={BIDANG_LIST}
       />
 
     </div>

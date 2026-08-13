@@ -59,3 +59,11 @@ export interface DashboardStats {
   completenessPercentage: number;
   byBidang: Record<string, { total: number; ada: number; persentase: number }>;
 }
+
+export type BidangTargets = Record<string, number>;
+
+export interface TargetSettings {
+  targets: BidangTargets;
+  updatedAt: string;
+  updatedBy: string;
+}

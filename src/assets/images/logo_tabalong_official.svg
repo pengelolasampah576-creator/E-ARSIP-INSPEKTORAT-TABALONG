@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="100%" height="100%">
+  <!-- Outer Shield Outline & Background -->
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Green Shield Path -->
+  <path d="M 12 12 L 388 12 L 388 230 C 388 380, 200 482, 200 488 C 200 482, 12 380, 12 230 Z" 
+        fill="#116b34" 
+        stroke="#dca81d" 
+        stroke-width="18" 
+        stroke-linejoin="round"/>
+  
+  <path d="M 21 21 L 379 21 L 379 230 C 379 375, 200 472, 200 478 C 200 472, 21 375, 21 230 Z" 
+        fill="none" 
+        stroke="#000000" 
+        stroke-width="2.5"/>
+
+  <!-- Top Header Bar -->
+  <rect x="22" y="22" width="356" height="52" fill="#094a22" stroke="#000000" stroke-width="2"/>
+  <text x="200" y="60" font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-size="36" fill="#ffffff" text-anchor="middle" letter-spacing="12">TABALONG</text>
+
+  <!-- White Star -->
+  <polygon points="200,85 207,106 229,106 211,119 218,140 200,127 182,140 189,119 171,106 193,106" fill="#ffffff" stroke="#000000" stroke-width="1.5"/>
+
+  <!-- Center Shield Base (Yellow with Black Flanks) -->
+  <g id="center-monument">
+    <!-- Black Side Panels -->
+    <rect x="95" y="145" width="45" height="140" fill="#181818" stroke="#000000" stroke-width="2"/>
+    <rect x="260" y="145" width="45" height="140" fill="#181818" stroke="#000000" stroke-width="2"/>
+
+    <!-- Yellow Central Shield -->
+    <path d="M 120 108 L 280 108 L 280 230 C 280 280, 200 325, 200 325 C 200 325, 120 280, 120 230 Z" 
+          fill="#e2b027" stroke="#000000" stroke-width="2.5"/>
+
+    <!-- Oil Derrick Structure -->
+    <!-- Derrick Tower Base/Structure -->
+    <path d="M 160 135 L 240 135 L 255 305 L 145 305 Z" fill="none" stroke="#000000" stroke-width="3"/>
+    <line x1="168" y1="135" x2="168" y2="120" stroke="#000" stroke-width="3"/>
+    <line x1="232" y1="135" x2="232" y2="120" stroke="#000" stroke-width="3"/>
+    <line x1="160" y1="120" x2="240" y2="120" stroke="#000" stroke-width="3"/>
+
+    <!-- Derrick Horizontal Beams -->
+    <line x1="156" y1="165" x2="244" y2="165" stroke="#000000" stroke-width="2"/>
+    <line x1="152" y1="200" x2="248" y2="200" stroke="#000000" stroke-width="2"/>
+    <line x1="148" y1="235" x2="252" y2="235" stroke="#000000" stroke-width="2"/>
+    <line x1="146" y1="270" x2="254" y2="270" stroke="#000000" stroke-width="2"/>
+
+    <!-- Derrick Cross Braces (X Shapes) -->
+    <line x1="160" y1="135" x2="244" y2="165" stroke="#000000" stroke-width="1.8"/>
+    <line x1="240" y1="135" x2="156" y2="165" stroke="#000000" stroke-width="1.8"/>
+
+    <line x1="156" y1="165" x2="248" y2="200" stroke="#000000" stroke-width="1.8"/>
+    <line x1="244" y1="165" x2="152" y2="200" stroke="#000000" stroke-width="1.8"/>
+
+    <line x1="152" y1="200" x2="252" y2="235" stroke="#000000" stroke-width="1.8"/>
+    <line x1="248" y1="200" x2="148" y2="235" stroke="#000000" stroke-width="1.8"/>
+
+    <line x1="148" y1="235" x2="254" y2="270" stroke="#000000" stroke-width="1.8"/>
+    <line x1="252" y1="235" x2="146" y2="270" stroke="#000000" stroke-width="1.8"/>
+
+    <!-- Lower Derrick Door / Base -->
+    <polygon points="172,305 172,280 228,280 228,305" fill="#6d3a17" stroke="#000000" stroke-width="2"/>
+    <line x1="182" y1="280" x2="175" y2="305" stroke="#ffffff" stroke-width="3"/>
+    <line x1="194" y1="280" x2="187" y2="305" stroke="#ffffff" stroke-width="3"/>
+    <line x1="206" y1="280" x2="199" y2="305" stroke="#ffffff" stroke-width="3"/>
+    <line x1="218" y1="280" x2="211" y2="305" stroke="#ffffff" stroke-width="3"/>
+  </g>
+
+  <!-- Left Side: Rice & Cotton Stalk (Padi & Kapas) -->
+  <g id="padi-kapas">
+    <!-- Main stem -->
+    <path d="M 52 315 C 45 220, 68 150, 58 98" fill="none" stroke="#000000" stroke-width="3"/>
+
+    <!-- Padi Grains (Gold) -->
+    <path d="M 52 110 C 35 110, 30 120, 48 128 C 30 130, 25 140, 46 148 C 25 150, 20 160, 44 168 C 22 170, 18 180, 42 188 C 20 190, 16 205, 42 210 C 22 215, 18 230, 45 232 C 25 238, 22 250, 48 252 C 28 258, 25 272, 52 272" fill="#e2b027" stroke="#000" stroke-width="1.5"/>
+
+    <!-- Cotton Flowers (White with green calyx) -->
+    <g fill="#ffffff" stroke="#000000" stroke-width="1.5">
+      <circle cx="72" cy="118" r="8"/>
+      <circle cx="78" cy="152" r="8"/>
+      <circle cx="82" cy="188" r="8"/>
+      <circle cx="85" cy="225" r="8"/>
+      <circle cx="88" cy="265" r="8"/>
+    </g>
+    <!-- Leaves (Green) -->
+    <g fill="#116b34" stroke="#000000" stroke-width="1.2">
+      <path d="M 60 122 C 70 120, 75 126, 68 130 Z"/>
+      <path d="M 64 156 C 74 154, 80 160, 72 164 Z"/>
+      <path d="M 68 192 C 78 190, 84 196, 76 200 Z"/>
+      <path d="M 70 229 C 80 227, 86 233, 78 237 Z"/>
+      <path d="M 72 269 C 82 267, 88 273, 80 277 Z"/>
+    </g>
+  </g>
+
+  <!-- Right Side: Chain Links (Rantai Emas) -->
+  <g id="chain-links" fill="#e2b027" stroke="#000000" stroke-width="3">
+    <!-- Link 1 -->
+    <rect x="332" y="105" width="30" height="52" rx="15" ry="15"/>
+    <rect x="340" y="117" width="14" height="28" rx="7" ry="7" fill="#116b34"/>
+    
+    <!-- Link 2 -->
+    <rect x="332" y="165" width="30" height="52" rx="15" ry="15"/>
+    <rect x="340" y="177" width="14" height="28" rx="7" ry="7" fill="#116b34"/>
+
+    <!-- Link 3 -->
+    <rect x="332" y="225" width="30" height="52" rx="15" ry="15"/>
+    <rect x="340" y="237" width="14" height="28" rx="7" ry="7" fill="#116b34"/>
+
+    <!-- Interconnecting bars -->
+    <line x1="347" y1="157" x2="347" y2="165" stroke="#e2b027" stroke-width="8"/>
+    <line x1="347" y1="157" x2="347" y2="165" stroke="#000000" stroke-width="2"/>
+    <line x1="347" y1="217" x2="347" y2="225" stroke="#e2b027" stroke-width="8"/>
+    <line x1="347" y1="217" x2="347" y2="225" stroke="#000000" stroke-width="2"/>
+  </g>
+
+  <!-- Red Ribbon "SARABA KAWA" -->
+  <g id="ribbon">
+    <!-- Ribbon Ends -->
+    <path d="M 90 300 L 112 290 L 112 335 L 90 345 L 100 322 Z" fill="#b21810" stroke="#000000" stroke-width="2"/>
+    <path d="M 310 300 L 288 290 L 288 335 L 310 345 L 300 322 Z" fill="#b21810" stroke="#000000" stroke-width="2"/>
+
+    <!-- Main Curved Red Banner -->
+    <path d="M 100 302 Q 200 338 300 302 L 295 348 Q 200 385 105 348 Z" fill="#d91e18" stroke="#000000" stroke-width="2.5"/>
+
+    <!-- Banner Text SARABA KAWA -->
+    <path id="text-path" d="M 108 330 Q 200 366 292 330" fill="none"/>
+    <text font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-size="22" fill="#ffffff" stroke="#000000" stroke-width="0.5">
+      <textPath href="#text-path" startOffset="50%" text-anchor="middle" letter-spacing="3">
+        SARABA KAWA
+      </textPath>
+    </text>
+  </g>
+
+  <!-- Crossed Mandau Swords (Mandau Bersilang) -->
+  <g id="mandau-swords">
+    <!-- Left to Right Mandau -->
+    <g>
+      <!-- Handle Left -->
+      <path d="M 148 435 L 175 420 L 165 410 L 140 422 C 135 425 135 435 148 435 Z" fill="#6d3a17" stroke="#000000" stroke-width="2"/>
+      <!-- Blade Left to Right -->
+      <path d="M 172 418 L 295 352 C 298 350, 302 355, 298 358 L 182 430 Z" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+    </g>
+
+    <!-- Right to Left Mandau -->
+    <g>
+      <!-- Handle Right -->
+      <path d="M 252 435 L 225 420 L 235 410 L 260 422 C 265 425 265 435 252 435 Z" fill="#6d3a17" stroke="#000000" stroke-width="2"/>
+      <!-- Blade Right to Left -->
+      <path d="M 228 418 L 105 352 C 102 350, 98 355, 102 358 L 218 430 Z" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+    </g>
+  </g>
+</svg>
