@@ -328,50 +328,122 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
+  // Helper to ensure an object has no undefined fields for Firestore and no oversized base64 strings
+  const sanitizeForFirestore = <T extends Record<string, any>>(obj: T): T => {
+    const clean: Record<string, any> = {};
+    Object.keys(obj).forEach((key) => {
+      const val = obj[key];
+      clean[key] = val === undefined ? '' : val;
+    });
+
+    // Check if fileUrl is a huge base64 string (> 750,000 characters, exceeds Firestore 1MB doc limit)
+    if (typeof clean.fileUrl === 'string' && clean.fileUrl.startsWith('data:') && clean.fileUrl.length > 750000) {
+      console.warn('File base64 size exceeds Firestore 1MB document limit. Storing metadata with safe URL marker.');
+      clean.fileUrl = clean.fileUrl.substring(0, 100) + '...[stored-locally]';
+    }
+
+    return clean as T;
+  };
+
   // Document Operations using Realtime Firebase Firestore
   const handleSaveDocument = async (docData: Partial<DocumentItem>) => {
     const user = currentUser?.name || 'Admin';
 
     setIsDocModalOpen(false);
 
-    try {
-      if (editingDoc) {
-        const updatedItem: DocumentItem = {
-          ...editingDoc,
-          ...docData,
-          updatedAt: new Date().toISOString(),
-          updatedBy: user
-        };
+    // 1. Try uploading base64 file to server /api/upload if needed
+    let fileUrlToSave = docData.fileUrl || '';
+    let fileNameToSave = docData.fileName || '';
+    let fileSizeToSave = docData.fileSize || '';
 
-        setEditingDoc(null);
-        await setDoc(doc(db, 'documents', editingDoc.id), updatedItem);
-        await logActionToFirestore('Ubah Dokumen', `Memperbarui dokumen ${updatedItem.masterRegulasi || updatedItem.id}`);
-      } else {
-        const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
-        const newId = `doc-${Date.now()}`;
-        const newItem: DocumentItem = {
-          id: newId,
-          no: maxNo + 1,
-          bidang: docData.bidang || 'Pengawasan',
-          jenisDokumen: docData.jenisDokumen || 'Peraturan',
-          masterRegulasi: docData.masterRegulasi || 'Regulasi Baru',
-          dokumenYangAda: docData.dokumenYangAda || '-',
-          tahunTerbit: docData.tahunTerbit || '-',
-          status: docData.status || 'Ada',
-          catatan: docData.catatan || '',
-          fileName: docData.fileName || '',
-          fileUrl: docData.fileUrl || '',
-          fileSize: docData.fileSize || '',
-          updatedAt: new Date().toISOString(),
-          updatedBy: user
-        };
+    if (fileUrlToSave.startsWith('data:')) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: fileNameToSave || 'dokumen.pdf',
+            fileData: fileUrlToSave
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-        await setDoc(doc(db, 'documents', newId), newItem);
-        await logActionToFirestore('Tambah Dokumen', `Menambahkan dokumen baru: ${newItem.masterRegulasi}`);
+        if (res.ok) {
+          const uploadData = await res.json();
+          if (uploadData.fileUrl) {
+            fileUrlToSave = uploadData.fileUrl;
+            if (uploadData.fileName) fileNameToSave = uploadData.fileName;
+            if (uploadData.fileSize) fileSizeToSave = uploadData.fileSize;
+          }
+        }
+      } catch (err) {
+        console.warn('Server upload API unavailable or timed out, preserving local file state:', err);
       }
+    }
+
+    let targetDocId = '';
+    let itemToSave: DocumentItem;
+
+    if (editingDoc) {
+      targetDocId = editingDoc.id;
+      itemToSave = {
+        ...editingDoc,
+        ...docData,
+        fileUrl: fileUrlToSave,
+        fileName: fileNameToSave,
+        fileSize: fileSizeToSave,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user
+      };
+      setEditingDoc(null);
+    } else {
+      const maxNo = documents.reduce((max, d) => (d.no && d.no > max ? d.no : max), 0);
+      targetDocId = `doc-${Date.now()}`;
+      itemToSave = {
+        id: targetDocId,
+        no: maxNo + 1,
+        bidang: docData.bidang || 'Pengawasan',
+        jenisDokumen: docData.jenisDokumen || 'Peraturan',
+        masterRegulasi: docData.masterRegulasi || 'Regulasi Baru',
+        dokumenYangAda: docData.dokumenYangAda || '-',
+        tahunTerbit: docData.tahunTerbit || '-',
+        status: docData.status || 'Ada',
+        catatan: docData.catatan || '',
+        fileName: fileNameToSave,
+        fileUrl: fileUrlToSave,
+        fileSize: fileSizeToSave,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user
+      };
+    }
+
+    // 2. Immediately update local state & localStorage so the UI updates instantly
+    setDocuments((prevDocs) => {
+      const existingIdx = prevDocs.findIndex((d) => d.id === targetDocId);
+      let updatedList: DocumentItem[];
+      if (existingIdx >= 0) {
+        updatedList = [...prevDocs];
+        updatedList[existingIdx] = itemToSave;
+      } else {
+        updatedList = [...prevDocs, itemToSave];
+      }
+      safeSaveToLocalStorage('earsip_documents', updatedList);
+      return updatedList;
+    });
+
+    // 3. Persist to Firestore cleanly
+    try {
+      const sanitizedItem = sanitizeForFirestore(itemToSave);
+      await setDoc(doc(db, 'documents', targetDocId), sanitizedItem);
+      await logActionToFirestore(
+        editingDoc ? 'Ubah Dokumen' : 'Tambah Dokumen',
+        `${editingDoc ? 'Memperbarui' : 'Menambahkan'} dokumen: ${itemToSave.masterRegulasi}`
+      );
     } catch (err) {
-      console.error('Error saving document to Firestore:', err);
-      alert('Gagal menyimpan dokumen ke Firebase Firestore.');
+      console.warn('Could not sync document to Firestore cloud (saved locally):', err);
     }
   };
 
@@ -379,14 +451,18 @@ export default function App() {
     const targetDoc = documents.find(d => d.id === id);
     if (!targetDoc) return;
 
+    const updatedItem = {
+      ...targetDoc,
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser?.name || 'Admin'
+    };
+
+    setDocuments(prev => prev.map(d => d.id === id ? updatedItem : d));
+    safeSaveToLocalStorage('earsip_documents', documents.map(d => d.id === id ? updatedItem : d));
+
     try {
-      const updatedItem = {
-        ...targetDoc,
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-        updatedBy: currentUser?.name || 'Admin'
-      };
-      await setDoc(doc(db, 'documents', id), updatedItem);
+      await setDoc(doc(db, 'documents', id), sanitizeForFirestore(updatedItem));
       await logActionToFirestore('Ubah Status', `Mengubah status dokumen "${targetDoc.masterRegulasi}" menjadi ${newStatus}`);
     } catch (err) {
       console.error('Error updating status in Firestore:', err);
@@ -439,7 +515,7 @@ export default function App() {
         chunk.forEach((item: DocumentItem) => {
           if (item.id) {
             const itemRef = doc(db, 'documents', item.id);
-            batch.set(itemRef, item);
+            batch.set(itemRef, sanitizeForFirestore(item));
           }
         });
         await batch.commit();
