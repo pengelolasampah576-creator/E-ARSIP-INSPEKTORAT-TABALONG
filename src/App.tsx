@@ -16,7 +16,7 @@ import { TargetModal } from './components/TargetModal';
 import { LOGO_URL } from './assets';
 import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
 import { db, collection, onSnapshot, setDoc, doc, deleteDoc, writeBatch, getDocs } from './lib/firebase';
-import { saveFileToIndexedDB, getFileFromIndexedDB } from './utils/fileStorage';
+import { saveFileToIndexedDB } from './utils/fileStorage';
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -411,42 +411,24 @@ export default function App() {
 
     setIsDocModalOpen(false);
 
+    // By this point, DocumentModal has already uploaded any attached file straight to
+    // Firebase Cloud Storage and docData.fileUrl is a public https download URL (so it
+    // works for every visitor of the site, not just this browser). We simply pass it
+    // through to Firestore below. The `data:`/IndexedDB fallback is kept only as a
+    // safety net for older records saved before this fix.
     let fileUrlToSave = docData.fileUrl || '';
     let fileNameToSave = docData.fileName || '';
     let fileSizeToSave = docData.fileSize || '';
 
     let targetDocId = editingDoc ? editingDoc.id : `doc-${Date.now()}`;
 
-    // 1. If base64 file, save to IndexedDB for reliable offline / local previewing
     if (fileUrlToSave.startsWith('data:')) {
+      // Legacy fallback: if a file somehow still arrives as a base64 data URL,
+      // keep a local copy in IndexedDB so it doesn't crash the save, but this
+      // will only be viewable from this browser. This path should no longer
+      // trigger during normal use.
       await saveFileToIndexedDB(targetDocId, fileUrlToSave);
-
-      // Try uploading base64 file to server /api/upload if server is reachable
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: fileNameToSave || 'dokumen.pdf',
-            fileData: fileUrlToSave
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const uploadData = await res.json();
-          if (uploadData.fileUrl) {
-            fileUrlToSave = uploadData.fileUrl;
-            if (uploadData.fileName) fileNameToSave = uploadData.fileName;
-            if (uploadData.fileSize) fileSizeToSave = uploadData.fileSize;
-          }
-        }
-      } catch (err) {
-        console.warn('Server upload API unavailable or timed out, preserving local IndexedDB file state:', err);
-      }
+      console.warn('Berkas tersimpan hanya secara lokal (IndexedDB) — unggah ke Firebase Storage gagal atau dilewati.');
     }
 
     let itemToSave: DocumentItem;

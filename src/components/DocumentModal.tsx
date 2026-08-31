@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentItem, DocumentStatus, JenisDokumen } from '../types';
 import { X, Save, FileText, Upload, CheckCircle2 } from 'lucide-react';
+import { storage, storageRef, uploadBytesResumable, getDownloadURL } from '../lib/firebase';
 
 interface DocumentModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
   const [fileUrl, setFileUrl] = useState('');
   const [fileSize, setFileSize] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     if (initialData) {
@@ -87,6 +89,7 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
     if (!file) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
 
     const calcSizeMB = file.size / (1024 * 1024);
     const sizeStr = calcSizeMB >= 1 
@@ -94,45 +97,35 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
       : `${Math.round(file.size / 1024)} KB`;
 
     try {
-      const reader = new FileReader();
-      
-      const fileData = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Gagal membaca berkas lokal'));
-        reader.readAsDataURL(file);
+      // Upload the actual file bytes to Firebase Cloud Storage, so the file is
+      // hosted online and viewable by ANYONE with the app link — not just this browser.
+      const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const storagePath = `documents/${Date.now()}_${safeName}`;
+      const fileRef = storageRef(storage, storagePath);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      const downloadUrl = await new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            setUploadProgress(pct);
+          },
+          (err) => reject(err),
+          async () => {
+            try {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(url);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        );
       });
 
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: file.name,
-            fileData
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          setFileUrl(data.fileUrl || fileData);
-          setFileName(data.fileName || file.name);
-          setFileSize(data.fileSize || sizeStr);
-        } else {
-          setFileUrl(fileData);
-          setFileName(file.name);
-          setFileSize(sizeStr);
-        }
-      } catch (uploadErr) {
-        console.warn('API upload fallback to local data URL:', uploadErr);
-        setFileUrl(fileData);
-        setFileName(file.name);
-        setFileSize(sizeStr);
-      }
+      setFileUrl(downloadUrl);
+      setFileName(file.name);
+      setFileSize(sizeStr);
 
       if (!dokumenYangAda) {
         setDokumenYangAda(file.name.replace(/\.[^/.]+$/, ""));
@@ -141,8 +134,8 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
         setStatus('Ada');
       }
     } catch (err: any) {
-      console.error('Error processing file:', err);
-      alert('Gagal memproses berkas.');
+      console.error('Error uploading file to Firebase Storage:', err);
+      alert('Gagal mengunggah berkas ke server. Periksa koneksi internet Anda dan coba lagi.');
     } finally {
       setIsUploading(false);
     }
@@ -308,7 +301,7 @@ export const DocumentModal: React.FC<DocumentModalProps> = ({
               />
               {isUploading && (
                 <span className="text-xs text-amber-700 font-semibold animate-pulse">
-                  Mengunggah berkas ke server...
+                  Mengunggah berkas ke server... {uploadProgress}%
                 </span>
               )}
               {!isUploading && fileName && (
